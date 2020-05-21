@@ -1,0 +1,398 @@
+---
+title: "Figure 2 - richness in stages"
+author: "Sven Tobias-Hunefeldt"
+date: "06/04/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Set up
+Import data and refine as done using the set up script.
+
+```{r load packages}
+
+library(microbiome)
+library(Rmisc)
+library(ggplot2)
+library(ggpubr)
+library(vegan)
+library(RVAideMemoire)
+library(tidyverse)
+library(tibble)
+
+```
+```{r Refine colours and shapes}
+#Refine colours
+cbbPalette <- c("black",
+                "red",
+                "navy", 
+                "green", 
+                "magenta",
+                "forestgreen",
+                "turquoise")
+
+Time_colour_list = c("0" = "turquoise", 
+                     "7" = "forestgreen", 
+                     "14" = "black", 
+                     "19" = "red", 
+                     "28" = "navy", 
+                     "42" = "green", 
+                     "56" = "magenta")
+
+#Refine shape list
+Substrate_shape_list = c("Plastic" = 15, #Filled square 
+                         "Glass" = 16, #Filled circle
+                         "Tile" = 17, #Filled Triangle
+                         "Wood" = 5, #Hollow diamond
+                         "Water" = 11) #Lined star
+
+#Make colour lists
+Substrate_colour_list = c("Plastic" = "black",
+                  "Glass" = "green",
+                  "Tile" = "blue",
+                  "Wood" = "magenta")
+
+Sequencing_colours = c("Prokaryotes" = "black",
+                       "Eukaryotes" = "red")
+
+Mesh_Palette = c("Exclusive" = "#000000",
+                 "Native" = "#E69F00")
+
+```
+#Figure 2 A
+```{r Calculate prokaryotic alpha diversity measure}
+#Calculate richness
+alpha_summary_16S <- estimate_richness(Phyloseq_Biofilm_16S, measures = c("Observed", "Shannon"))
+#Make rownmes match with sample data
+row.names(alpha_summary_16S) =gsub("X", "", row.names(alpha_summary_16S))
+#Calculate evenness
+Evenness_16S <- evenness(Phyloseq_Biofilm_16S, 'pielou')
+#Append evenness to other diversity metrics
+alpha_summary_16S$Pielou <- Evenness_16S$pielou
+
+#Combine diveristy metrics with metadata
+Map_16S_alpha <- data.frame(alpha_summary_16S, sample_data(Phyloseq_Biofilm_16S))
+#Save diveristy metrics into phyloseq objects metadata
+sample_data(Phyloseq_Biofilm_16S) = Map_16S_alpha
+#Make sure it's worked
+Phyloseq_Biofilm_16S@sam_data
+
+#Subset diversity data to only biofilm data
+Map_16S_alpha_noA = subset(Map_16S_alpha, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
+#Ensure prokaryotic data is noted
+Map_16S_alpha_noA$Sequencing = "Prokaryotes"
+
+#Subset into biofilm phyloseq object with diversity metrics
+Phyloseq_Biofilm_16S_noA = subset_samples(Phyloseq_Biofilm_16S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
+
+```
+```{r Means and mapping for prokarotes}
+Map_16S_alpha_noA$Mesh_status = gsub("Exposed","Native", Map_16S_alpha_noA$Mesh_status)
+Map_16S_alpha_noA$Mesh_status = gsub("Enclosed","Exclusive", Map_16S_alpha_noA$Mesh_status)
+
+#Substrate re-nameing
+Map_16S_alpha_noA$Substrate = gsub("Acryl", "Plastic", Map_16S_alpha_noA$Substrate)
+Map_16S_alpha_noA$Substrate = gsub("Pine", "Wood", Map_16S_alpha_noA$Substrate)
+
+Map_16S_alpha_noA$Substrate <- factor(Map_16S_alpha_noA$Substrate,
+                         levels=(unique(Map_16S_alpha_noA$Substrate)))
+
+Map_16S_alpha_noA$Substrate <- factor(Map_16S_alpha_noA$Substrate,
+                         levels=c("Plastic", "Glass", "Tile", "Wood"))
+
+
+Alpha_Wood = subset(Map_16S_alpha_noA, Substrate == "Wood")
+Wood = mean(Alpha_Wood$Observed) #734.5938
+Alpha_Plastic = subset(Map_16S_alpha_noA, Substrate == "Plastic")
+Plastic = mean(Alpha_Plastic$Observed) #765.9375
+Alpha_Glass = subset(Map_16S_alpha_noA, Substrate == "Glass")
+Glass = mean(Alpha_Glass$Observed) #762.4545
+Alpha_Tile = subset(Map_16S_alpha_noA, Substrate == "Tile")
+Tile = mean(Alpha_Tile$Observed) #808.0357
+
+Alpha_NoWood = subset(Map_16S_alpha_noA, Substrate!= "Wood")
+NoWood = mean(Alpha_NoWood$Observed) #777.3763
+
+p1 = Wood - Plastic
+p2 = Wood - Glass
+p3 = Wood - Tile
+pA = Wood - NoWood
+
+Map_16S_alpha_noA$Mesh_status =gsub("Open", "Predated", Map_16S_alpha_noA$Mesh_status)
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(Sample_time) %>% 
+  summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(StageofBiofilm) %>% 
+  summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+test_mean$mean_val[1]-test_mean$mean_val[2]
+test_mean$sd[1]-test_mean$sd[2]
+test_mean$sd[1]/test_mean$mean_val[1]
+test_mean$sd[2]/test_mean$mean_val[2]
+(test_mean$sd[2]/test_mean$mean_val[2])/(test_mean$sd[1]/test_mean$mean_val[1])
+
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(Mesh_status, Sample_time, Substrate) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(StageofBiofilm) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+#Make plot
+p <- ggboxplot(Map_16S_alpha_noA, 
+               x = "Mesh_status", 
+               y = "Observed",
+               color ="Substrate",
+               add = "jitter",
+               lwd = 1)+
+  scale_color_manual(values = cbbPalette)+
+  geom_hline(data= test_mean, aes(yintercept=mean_val))+
+  facet_grid(StageofBiofilm ~ Sequencing)+
+  ylab("Observed richness")+
+  xlab("Condition")+
+  theme_bw()+
+  My_Theme
+#Inspect
+p    
+
+#Add stats
+Figure2A = p + stat_compare_means(aes(group = Mesh_status),
+                       label.x = 1.35,
+                       label.y = 10)+
+  stat_compare_means(aes(group = Substrate), 
+                     label.x = 1.2,
+                     label.y = 1500)
+#Inspect
+Figure2A
+
+
+```
+```{r Calculate means and sd}
+#Mean substrate
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(Substrate) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+#Substarte differences
+test_mean$mean_val[3] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[4])/3)
+
+#Mean across development and enclsoure condition
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(StageofBiofilm, Mesh_status) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+#Calculate difference
+test_mean$mean_val[2]-test_mean$mean_val[1]
+test_mean$mean_val[4]-test_mean$mean_val[3]
+
+#Mean substarte and enclsoure condition
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(Substrate, Mesh_status) %>% 
+  dplyr::summarise(sum_val = sum(Pielou), mean_val = mean(Pielou), sd = sd(Pielou))
+print(test_mean)
+
+#Mean across developmental phases
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(StageofBiofilm) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+#SD decrease over developmental phases
+(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[2]/test_mean$mean_val[2])
+
+#Mean over time
+test_mean = Map_16S_alpha_noA %>% 
+  group_by(Sample_time) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+#SD decrease over time
+(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[6]/test_mean$mean_val[6])
+```
+#Figure 2 B
+```{r Calculate prokaryotic alpha diversity measure}
+#Calculate richness
+alpha_summary_18S <- estimate_richness(Phyloseq_Biofilm_18S, measures = c("Observed", "Shannon"))
+#Make rownmes match with sample data
+row.names(alpha_summary_18S) =gsub("X", "", row.names(alpha_summary_18S))
+#Calculate evenness
+Evenness_18S <- evenness(Phyloseq_Biofilm_18S, 'pielou')
+#Append evenness to other diversity metrics
+alpha_summary_18S$Pielou <- Evenness_18S$pielou
+
+#Combine diveristy metrics with metadata
+Map_18S_alpha <- data.frame(alpha_summary_18S, sample_data(Phyloseq_Biofilm_18S))
+#Save diveristy metrics into phyloseq objects metadata
+sample_data(Phyloseq_Biofilm_18S) = Map_18S_alpha
+#Make sure it's worked
+Phyloseq_Biofilm_18S@sam_data
+
+#Subset diversity data to only biofilm data
+Map_18S_alpha_noA = subset(Map_18S_alpha, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
+#Ensure prokaryotic data is noted
+Map_18S_alpha_noA$Sequencing = "Prokaryotes"
+
+#Subset into biofilm phyloseq object with diversity metrics
+Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
+
+```
+```{r Means and mapping for prokarotes}
+Map_18S_alpha_noA$Mesh_status = gsub("Exposed","Native", Map_18S_alpha_noA$Mesh_status)
+Map_18S_alpha_noA$Mesh_status = gsub("Enclosed","Exclusive", Map_18S_alpha_noA$Mesh_status)
+
+#Substrate re-nameing
+Map_18S_alpha_noA$Substrate = gsub("Acryl", "Plastic", Map_18S_alpha_noA$Substrate)
+Map_18S_alpha_noA$Substrate = gsub("Pine", "Wood", Map_18S_alpha_noA$Substrate)
+
+Map_18S_alpha_noA$Substrate <- factor(Map_18S_alpha_noA$Substrate,
+                         levels=(unique(Map_18S_alpha_noA$Substrate)))
+
+Map_18S_alpha_noA$Substrate <- factor(Map_18S_alpha_noA$Substrate,
+                         levels=c("Plastic", "Glass", "Tile", "Wood"))
+
+
+Alpha_Wood = subset(Map_18S_alpha_noA, Substrate == "Wood")
+Wood = mean(Alpha_Wood$Observed) #734.5938
+Alpha_Plastic = subset(Map_18S_alpha_noA, Substrate == "Plastic")
+Plastic = mean(Alpha_Plastic$Observed) #765.9375
+Alpha_Glass = subset(Map_18S_alpha_noA, Substrate == "Glass")
+Glass = mean(Alpha_Glass$Observed) #762.4545
+Alpha_Tile = subset(Map_18S_alpha_noA, Substrate == "Tile")
+Tile = mean(Alpha_Tile$Observed) #808.0357
+
+Alpha_NoWood = subset(Map_18S_alpha_noA, Substrate!= "Wood")
+NoWood = mean(Alpha_NoWood$Observed) #777.3763
+
+p1 = Wood - Plastic
+p2 = Wood - Glass
+p3 = Wood - Tile
+pA = Wood - NoWood
+
+Map_18S_alpha_noA$Mesh_status =gsub("Open", "Predated", Map_18S_alpha_noA$Mesh_status)
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(Sample_time) %>% 
+  summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(StageofBiofilm) %>% 
+  summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+test_mean$mean_val[1]-test_mean$mean_val[2]
+test_mean$sd[1]-test_mean$sd[2]
+test_mean$sd[1]/test_mean$mean_val[1]
+test_mean$sd[2]/test_mean$mean_val[2]
+(test_mean$sd[2]/test_mean$mean_val[2])/(test_mean$sd[1]/test_mean$mean_val[1])
+
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(Mesh_status, Sample_time, Substrate) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(StageofBiofilm) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+#Make plot
+p <- ggboxplot(Map_18S_alpha_noA, 
+               x = "Mesh_status", 
+               y = "Observed",
+               color ="Substrate",
+               add = "jitter",
+               lwd = 1)+
+  scale_color_manual(values = cbbPalette)+
+  geom_hline(data= test_mean, aes(yintercept=mean_val))+
+  facet_grid(StageofBiofilm ~ Sequencing)+
+  ylab("Observed richness")+
+  xlab("Condition")+
+  theme_bw()+
+  My_Theme
+#Inspect
+p    
+
+#Add stats
+Figure2B = p + stat_compare_means(aes(group = Mesh_status),
+                       label.x = 1.35,
+                       label.y = 10)+
+  stat_compare_means(aes(group = Substrate), 
+                     label.x = 1.2,
+                     label.y = 600)
+#Inspect
+Figure2B
+
+
+```
+```{r Calculate means and sd}
+#Mean substrate
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(Substrate) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+#Substarte differences
+test_mean$mean_val[3] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[4])/3)
+
+#Mean across development and enclsoure condition
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(StageofBiofilm, Mesh_status) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+#Calculate difference
+test_mean$mean_val[2]-test_mean$mean_val[1]
+test_mean$mean_val[4]-test_mean$mean_val[3]
+
+#Mean substarte and enclsoure condition
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(Substrate, Mesh_status) %>% 
+  dplyr::summarise(sum_val = sum(Pielou), mean_val = mean(Pielou), sd = sd(Pielou))
+print(test_mean)
+
+#Mean across developmental phases
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(StageofBiofilm) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+#SD decrease over developmental phases
+(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[2]/test_mean$mean_val[2])
+
+#Mean over time
+test_mean = Map_18S_alpha_noA %>% 
+  group_by(Sample_time) %>% 
+  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
+print(test_mean)
+
+#SD decrease over time
+(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[6]/test_mean$mean_val[6])
+```
+
+Statistics are the same as figure 1 A-B
+#Combine into one figure
+```{r}
+
+#Make
+Figure2ms = ggarrange(Figure2A,
+                      Figure2B,
+                      common.legend = T,
+                      legend = "right",
+                      labels = c("A", "B"))
+#Ensure it looks good
+Figure2ms
+
+
+#Save plot
+pdf("~/Desktop/Biofilm_project/Analysis/Clean_ms_Code/Figures_Table/Figure2ms_StageRichness.pdf", width = 16, height = 6.66)
+Figure2ms
+dev.off()
+
+```
