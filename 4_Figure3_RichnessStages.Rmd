@@ -30,7 +30,7 @@ library(tibble)
 cbbPalette <- c("black",
                 "red",
                 "navy", 
-                "green", 
+                "forestgreen", 
                 "magenta",
                 "forestgreen",
                 "turquoise")
@@ -92,7 +92,7 @@ Phyloseq_Biofilm_16S_noA = subset_samples(Phyloseq_Biofilm_16S, Project == "Mari
 ```
 ```{r Means and mapping for prokarotes}
 Map_16S_alpha_noA$Mesh_status = gsub("Exposed","Native", Map_16S_alpha_noA$Mesh_status)
-Map_16S_alpha_noA$Mesh_status = gsub("Enclosed","Exclusive", Map_16S_alpha_noA$Mesh_status)
+#Map_16S_alpha_noA$Mesh_status = gsub("Enclosed","Exclusive", Map_16S_alpha_noA$Mesh_status)
 
 #Substrate re-nameing
 Map_16S_alpha_noA$Substrate = gsub("Acryl", "Plastic", Map_16S_alpha_noA$Substrate)
@@ -184,9 +184,9 @@ test_mean = Map_16S_alpha_noA %>%
   dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
 print(test_mean)
 #Substarte differences
-test_mean$mean_val[3] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[4])/3)
+test_mean$mean_val[4] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[3])/3)
 
-#Mean across development and enclsoure condition
+#Mean across development and enclosure condition
 test_mean = Map_16S_alpha_noA %>% 
   group_by(StageofBiofilm, Mesh_status) %>% 
   dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
@@ -218,6 +218,32 @@ print(test_mean)
 
 #SD decrease over time
 (test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[6]/test_mean$mean_val[6])
+
+
+
+kruskal.test(Observed ~ Sample_time, data = Map_16S_alpha_noA)
+
+Map_16S_alpha_noAEarly = subset(Map_16S_alpha_noA, StageofBiofilm == "Early")
+wilcox.test(Map_16S_alpha_noAEarly$Observed ~ Map_16S_alpha_noAEarly$Sample_time)
+kruskal.test(Observed ~ Substrate, data = Map_16S_alpha_noAEarly)
+
+
+Map_16S_alpha_noALate = subset(Map_16S_alpha_noA, StageofBiofilm == "Late")
+
+kruskal.test(Observed ~ Substrate, data = Map_16S_alpha_noALate)
+kruskal.test(Observed ~ Sample_time, data = Map_16S_alpha_noAEarly)
+kruskal.test(Observed ~ Sample_time, data = Map_16S_alpha_noALate)
+
+wilcox.test(Map_16S_alpha_noA$Observed ~ Map_16S_alpha_noA$StageofBiofilm) #Significant differences between successional stages
+
+pairwise.wilcox.test(Map_16S_alpha_noAEarly$Observed, Map_16S_alpha_noAEarly$Substrate)
+pairwise.wilcox.test(Map_16S_alpha_noA$Observed, Map_16S_alpha_noA$StageofBiofilm)
+
+pairwise.wilcox.test(Map_16S_alpha_noA$Observed, Map_16S_alpha_noA$Sample_time, p.adjust.method = "bonferroni")
+
+pairwise.wilcox.test(Map_16S_alpha_noAEarly$Observed, Map_16S_alpha_noAEarly$Substrate)
+pairwise.wilcox.test(Map_16S_alpha_noALate$Observed, Map_16S_alpha_noALate$Substrate)
+
 ```
 #Figure 2 B
 ```{r Calculate prokaryotic alpha diversity measure}
@@ -240,7 +266,7 @@ Phyloseq_Biofilm_18S@sam_data
 #Subset diversity data to only biofilm data
 Map_18S_alpha_noA = subset(Map_18S_alpha, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
 #Ensure prokaryotic data is noted
-Map_18S_alpha_noA$Sequencing = "Prokaryotes"
+Map_18S_alpha_noA$Sequencing = "Eukaryotes"
 
 #Subset into biofilm phyloseq object with diversity metrics
 Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
@@ -248,7 +274,7 @@ Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Mari
 ```
 ```{r Means and mapping for prokarotes}
 Map_18S_alpha_noA$Mesh_status = gsub("Exposed","Native", Map_18S_alpha_noA$Mesh_status)
-Map_18S_alpha_noA$Mesh_status = gsub("Enclosed","Exclusive", Map_18S_alpha_noA$Mesh_status)
+#Map_18S_alpha_noA$Mesh_status = gsub("Enclosed","Exclusive", Map_18S_alpha_noA$Mesh_status)
 
 #Substrate re-nameing
 Map_18S_alpha_noA$Substrate = gsub("Acryl", "Plastic", Map_18S_alpha_noA$Substrate)
@@ -340,9 +366,9 @@ test_mean = Map_18S_alpha_noA %>%
   dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
 print(test_mean)
 #Substarte differences
-test_mean$mean_val[3] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[4])/3)
+test_mean$mean_val[4] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[3])/3)
 
-#Mean across development and enclsoure condition
+#Mean across development and enclosure condition
 test_mean = Map_18S_alpha_noA %>% 
   group_by(StageofBiofilm, Mesh_status) %>% 
   dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
@@ -374,6 +400,28 @@ print(test_mean)
 
 #SD decrease over time
 (test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[6]/test_mean$mean_val[6])
+
+Map_18S_alpha_noAEarly = subset(Map_18S_alpha_noA, StageofBiofilm == "Early")
+kruskal.test(Observed ~ Sample_time, data = Map_18S_alpha_noA)
+kruskal.test(Observed ~ Substrate, data = Map_18S_alpha_noAEarly)
+
+Map_18S_alpha_noALate = subset(Map_18S_alpha_noA, StageofBiofilm == "Late")
+
+
+kruskal.test(Observed ~ Substrate, data = Map_18S_alpha_noALate)
+
+pairwise.wilcox.test(Map_18S_alpha_noAEarly$Observed, Map_18S_alpha_noAEarly$Substrate)
+
+wilcox.test(Map_18S_alpha_noA$Observed ~ Map_18S_alpha_noA$StageofBiofilm) #Significant differences between successional stages
+
+wilcox.test(Map_18S_alpha_noAEarly$Observed ~ Map_18S_alpha_noAEarly$Sample_time)
+pairwise.wilcox.test(Map_18S_alpha_noA$Observed, Map_18S_alpha_noA$Sample_time)
+pairwise.wilcox.test(Map_18S_alpha_noALate$Observed, Map_18S_alpha_noALate$Sample_time)
+
+pairwise.wilcox.test(Map_18S_alpha_noAEarly$Observed, Map_18S_alpha_noAEarly$Substrate)
+pairwise.wilcox.test(Map_18S_alpha_noALate$Observed, Map_18S_alpha_noALate$Substrate)
+
+
 ```
 
 Statistics are the same as figure 1 A-B
@@ -381,18 +429,18 @@ Statistics are the same as figure 1 A-B
 ```{r}
 
 #Make
-Figure2ms = ggarrange(Figure2A,
+Figure3ms = ggarrange(Figure2A,
                       Figure2B,
                       common.legend = T,
                       legend = "right",
                       labels = c("A", "B"))
 #Ensure it looks good
-Figure2ms
+Figure3ms
 
 
 #Save plot
-pdf("~/Desktop/Biofilm_project/Analysis/Clean_ms_Code/Figures_Table/Figure2ms_StageRichness.pdf", width = 16, height = 6.66)
-Figure2ms
+tiff("/YOUR/PATH/HERE/Figures_Tables/Figure3_StageRichness.tiff", units = "in", width = 16, height = 6.66, res = 300)
+Figure3ms
 dev.off()
 
 ```
