@@ -69,7 +69,7 @@ Phyloseq_Biofilm_16S_noA = subset_samples(Phyloseq_Biofilm_16S, Project == "Mari
 sample_data(Phyloseq_Biofilm_16S_noA)$Sample_time<-as.factor(as.character(sample_data(Phyloseq_Biofilm_16S_noA)$Sample_time))
 sample_data(Phyloseq_Biofilm_16S_noA)$Sequencing <-as.factor("Prokaryotes")
 sample_data(Phyloseq_Biofilm_16S_noA)$Mesh_status = gsub("Exposed", "Native", sample_data(Phyloseq_Biofilm_16S_noA)$Mesh_status)
-sample_data(Phyloseq_Biofilm_16S_noA)$Mesh_status = gsub("Enclosed", "Exclusive", sample_data(Phyloseq_Biofilm_16S_noA)$Mesh_status)
+#sample_data(Phyloseq_Biofilm_16S_noA)$Mesh_status = gsub("Enclosed", "Exclusive", sample_data(Phyloseq_Biofilm_16S_noA)$Mesh_status)
 
 #Calculate ordination matrix based on Bray-Curtis dissimilarity
 NMDS.ord_16S_noA <- ordinate(Phyloseq_Biofilm_16S_noA, method = "NMDS", distance = "bray")
@@ -109,9 +109,9 @@ Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Mari
 
 #Convert and reorder time for plotting
 sample_data(Phyloseq_Biofilm_18S_noA)$Sample_time<-as.factor(as.character(sample_data(Phyloseq_Biofilm_18S_noA)$Sample_time))
-sample_data(Phyloseq_Biofilm_18S_noA)$Sequencing <-as.factor("Prokaryotes")
+sample_data(Phyloseq_Biofilm_18S_noA)$Sequencing <-as.factor("Eukaryotes")
 sample_data(Phyloseq_Biofilm_18S_noA)$Mesh_status = gsub("Exposed", "Native", sample_data(Phyloseq_Biofilm_18S_noA)$Mesh_status)
-sample_data(Phyloseq_Biofilm_18S_noA)$Mesh_status = gsub("Encosed", "Exclusive", sample_data(Phyloseq_Biofilm_18S_noA)$Mesh_status)
+#sample_data(Phyloseq_Biofilm_18S_noA)$Mesh_status = gsub("Encosed", "Exclusive", sample_data(Phyloseq_Biofilm_18S_noA)$Mesh_status)
 
 #Calculate ordination matrix based on Bray-Curtis dissimilarity
 NMDS.ord_18S_noA <- ordinate(Phyloseq_Biofilm_18S_noA, method = "NMDS", distance = "bray")
@@ -131,7 +131,7 @@ NMDS_18S_noA = plot_ordination(Phyloseq_Biofilm_18S_noA,
   scale_shape_manual("Condition", values = c(16, 2))+
   geom_point(aes(size = 6), show.legend = F)+
   facet_grid(. ~ Sequencing)+
-  annotate("text", x=-2.5, y=2, size = 6, label= paste0("Stress = ", round(NMDS.ord_18S_noA$stress, digits = 3)))+
+  annotate("text", x=-2.3, y=2, size = 6, label= paste0("Stress = ", round(NMDS.ord_18S_noA$stress, digits = 3)))+
   guides(colour = guide_legend(order = 1),
          shape = guide_legend(order = 2, override.aes = list(size = 4)),
          size = F)+
@@ -155,7 +155,7 @@ SupplementaryFigure4ms = ggarrange(NMDS_16S_noA,
 SupplementaryFigure4ms
 
 #Save plot
-pdf("~/Desktop/Biofilm_project/Analysis/Clean_ms_Code/Figures_Table/SupplementaryFigure4ms_BiofilmEnclosureNMDS_sans.pdf", width = 16, height = 6.66)
+tiff("/YOUR/PATH/HERE/Figures_Tables/SupplementaryFigure7ms_BiofilmEnclosureNMDS.tiff", width = 16, height = 6.66, units = "in", res = 300)
 SupplementaryFigure4ms
 dev.off()
 
