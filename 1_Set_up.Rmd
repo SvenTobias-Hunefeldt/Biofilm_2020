@@ -11,102 +11,6 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 #Make environment and functions
-```{r Set up environment}
-#Set seed to make results more reproducable
-set.seed(2)
-
-#Set up working directory
-setwd("~/Desktop/Biofilm_project/Analysis/Biofilm_Analysis/")
-
-#Define theme for plotting
-My_Theme = theme(axis.title.x = element_text(size=18),
-       # theme_grey(base_size = 22),
-        axis.text.x = element_text(angle=0, colour = "black", vjust=1, hjust = 0.5, size=18), 
-        axis.text.y = element_text(colour = "black", size=18),
-        axis.title.y = element_text(face="bold",size=18),
-        plot.title = element_text(size = 18),
-        legend.title =element_text(size = 18),
-        legend.text = element_text(size = 16),
-        legend.position="right",
-        legend.key.size = unit(1, "cm"),
-        strip.text.x = element_text(size=18, face="bold"),
-        strip.text.y = element_text(size=18, face="bold"),
-        #panel.background = element_blank(),
-        panel.border = element_rect(fill = NA, colour = "black"),
-        strip.background = element_rect(colour="black"),
-       text = element_text(family = "sans"))
-
-#Phylum specific colours for consistency
-Phylum_colour_list <- c("Arthropoda" =  "black",
-                "Ciliophora" = "red",
-                "Cercozoa" = "violet",
-                "Euglenozoa" = "violetred4", 
-                "Florideophycidae" = "cornflowerblue",
-                "Incertae_Sedis_ph" = "",
-                "Nematoda" = "thistle3", 
-                "Ochrophyta" = "forestgreen",
-                "Bacteroidetes" = "darkred",
-                "Cyanobacteria" = "green",
-                "Epsilonbacteraeota" = "orange",
-                "Planctomycetes" = "turquoise",
-                "Proteobacteria" = "navy",
-                "Rare Taxa <1%" = "beige",
-                "Verrucomicrobia" = "magenta")
-
-#Colourblind friendly pallete
-cbbPalette <- c("black",
-                "red",
-                "navy", 
-                "green", 
-                "magenta",
-                "forestgreen")
-#If more options are needed
-#cbbPalette <- c("#000000", #Black
- #               "#E69F00", #Orange
-  #              "#56B4E9", #Blue (light)
-   #             "#009E73", #Sea green
-    #            "#CC79A7", #Magenta (light)
-     #           "#F0E442", #Yellow
-      #          "#0072B2", #Blue
-       #         "#D55E00", #Burnt orange
-        #        "dodgerblue4",
-         #       "rosybrown",
-          #      "floralwhite",
-           #     "lightgoldenrod4",
-            #    "cornsilk3",
-             #   "coral4",
-              #  "gray38",
-               # "turquoise4",
-                #"springgreen3",
-#                "slateblue3",
- #               "forestgreen",
-  #              "lightgreen") 
-
-#Shapes for ggplot2
-Shape_list = c(0, #Hollow square
-               15, #Filled square
-               1, #Hollow circle
-               16, #Filled circle
-               2, #Hollow triangle
-               17, #Filled triangle
-               5, #Hollow diamond
-               23) #Filled diamons
-                
-#Set up position dodge for ggplot2
-pd = position_dodge(0.15)
-
-#Sequencing status specific colours for consistency
-Organism_list = c("Prokaryotes" = "red",
-                  "Eukaryotes" = "navy")
-
-#Sequencing status specific colours for consistency
-#Organism_list = c("16S" = "red",
- #                 "18S" = "navy")
-
-#Enclosure status specific colours for consistency
-Condition_list = c("Open" = "red",
-                  "Enclosed" = "black")
-```
 ```{r Exact test function}
 
 #check open packages
@@ -209,6 +113,103 @@ phyloseq_to_edgeR = function(physeq, group, method = "RLE", ...) {
 
 
 ```
+```{r Set up environment}
+#Set seed to make results more reproducable
+set.seed(2)
+
+#Set up working directory
+setwd("/YOUR/PATH/HERE/")
+
+#Define theme for plotting
+My_Theme = theme_bw()+
+  theme(axis.title.x = element_text(size=18),
+       # theme_grey(base_size = 22),
+        axis.text.x = element_text(angle=0, colour = "black", vjust=1, hjust = 0.5, size=18), 
+        axis.text.y = element_text(colour = "black", size=18),
+        axis.title.y = element_text(size=18),
+        plot.title = element_text(size = 18, hjust = 0.5),
+        legend.title =element_text(size = 18),
+        legend.text = element_text(size = 16),
+        legend.position="right",
+        legend.key.size = unit(1, "cm"),
+        strip.text.x = element_text(size=18, face="bold"),
+        strip.text.y = element_text(size=18, face="bold"),
+        #panel.background = element_blank(),
+        panel.border = element_rect(fill = NA, colour = "black"),
+        strip.background = element_rect(colour="black"),
+       text = element_text(family = "sans"))
+
+#Phylum specific colours for consistency
+Phylum_colour_list <- c("Arthropoda" =  "black",
+                "Ciliophora" = "red",
+                "Cercozoa" = "violet",
+                "Euglenozoa" = "violetred4", 
+                "Florideophycidae" = "cornflowerblue",
+                "Incertae_Sedis_ph" = "",
+                "Nematoda" = "thistle3", 
+                "Ochrophyta" = "forestgreen",
+                "Bacteroidetes" = "darkred",
+                "Cyanobacteria" = "green",
+                "Epsilonbacteraeota" = "orange",
+                "Planctomycetes" = "turquoise",
+                "Proteobacteria" = "navy",
+                "Rare Taxa <1%" = "beige",
+                "Verrucomicrobia" = "magenta")
+
+#Colourblind friendly pallete
+cbbPalette <- c("black",
+                "red",
+                "navy", 
+                "green", 
+                "magenta",
+                "forestgreen")
+#If more options are needed
+#cbbPalette <- c("#000000", #Black
+ #               "#E69F00", #Orange
+  #              "#56B4E9", #Blue (light)
+   #             "#009E73", #Sea green
+    #            "#CC79A7", #Magenta (light)
+     #           "#F0E442", #Yellow
+      #          "#0072B2", #Blue
+       #         "#D55E00", #Burnt orange
+        #        "dodgerblue4",
+         #       "rosybrown",
+          #      "floralwhite",
+           #     "lightgoldenrod4",
+            #    "cornsilk3",
+             #   "coral4",
+              #  "gray38",
+               # "turquoise4",
+                #"springgreen3",
+#                "slateblue3",
+ #               "forestgreen",
+  #              "lightgreen") 
+
+#Shapes for ggplot2
+Shape_list = c(0, #Hollow square
+               15, #Filled square
+               1, #Hollow circle
+               16, #Filled circle
+               2, #Hollow triangle
+               17, #Filled triangle
+               5, #Hollow diamond
+               23) #Filled diamons
+                
+#Set up position dodge for ggplot2
+pd = position_dodge(0.15)
+
+#Sequencing status specific colours for consistency
+Organism_list = c("Prokaryotes" = "red",
+                  "Eukaryotes" = "navy")
+
+#Sequencing status specific colours for consistency
+#Organism_list = c("16S" = "red",
+ #                 "18S" = "navy")
+
+#Enclosure status specific colours for consistency
+Condition_list = c("Open" = "red",
+                  "Enclosed" = "black")
+```
 ```{r Rarification curve function}
 
 #Rarefaction function from https://github.com/joey711/phyloseq/issues/143
@@ -252,7 +253,7 @@ library(plyr)
 
 ```{r Import data}
 
-my_16S_phyloseq = readRDS("Phyloseq_object_16S.rds")
+my_16S_phyloseq = readRDS("/YOUR/PATH/HERE/Phyloseq_object_16S.rds")
 
 ```
 ##Subset to my project
@@ -267,7 +268,7 @@ Biofilm_16S = subset_samples(my_16S_phyloseq, Project == "Marine_Biofilm")
 nrow(Biofilm_16S@sam_data)
 
 #Import mapping file that contains metadata
-Mod_16S_map = read.csv("16S_Mapping_file.csv", row.names = 1)
+Mod_16S_map = read.csv("/YOUR/PATH/HERE/16S_Mapping_file.csv", row.names = 1)
 
 #Attach updated metadata to phyloseq object
 sample_data(Biofilm_16S) = Mod_16S_map
@@ -341,28 +342,27 @@ cbbPalette <- c("#000000", #Black
                 "forestgreen",
                 "lightgreen")
 ```
-
 ```{r}
 #Use function to calculate curve
-rarefaction_curve_data <- calculate_rarefaction_curves(Phyloseq_Biofilm_16S, c('Observed'), rep(c(1, 10, 100, 1:100 * 1000), each = 10))
+rarefaction_curve_data_16S <- calculate_rarefaction_curves(Phyloseq_Biofilm_16S, c('Observed'), rep(c(1, 10, 100, 1:100 * 1000), each = 10))
 #Summarise 
-summary(rarefaction_curve_data)
+summary(rarefaction_curve_data_16S)
 
 #Reformat data and summarise for plotting
-rarefaction_curve_data_summary <- ddply(rarefaction_curve_data, c('Depth', 'Sample', 'Measure'), summarise, Alpha_diversity_mean = mean(Alpha_diversity), Alpha_diversity_sd = sd(Alpha_diversity))
+rarefaction_curve_data_summary_16S <- ddply(rarefaction_curve_data_16S, c('Depth', 'Sample', 'Measure'), summarise, Alpha_diversity_mean = mean(Alpha_diversity), Alpha_diversity_sd = sd(Alpha_diversity))
 
 #Remove X from column and sample names to make reading easier
-colnames(rarefaction_curve_data_summary) = gsub("X","", colnames(rarefaction_curve_data_summary))
-rarefaction_curve_data_summary$Sample = gsub("X","", rarefaction_curve_data_summary$Sample)
+colnames(rarefaction_curve_data_summary_16S) = gsub("X","", colnames(rarefaction_curve_data_summary_16S))
+rarefaction_curve_data_summary_16S$Sample = gsub("X","", rarefaction_curve_data_summary_16S$Sample)
 
 #Merge phyloseq metadata and the rarefaction summary
-rarefaction_curve_data_summary_verbose <- merge(rarefaction_curve_data_summary, data.frame(sample_data(Phyloseq_Biofilm_16S))
+rarefaction_curve_data_summary_verbose_16S <- merge(rarefaction_curve_data_summary_16S, data.frame(sample_data(Phyloseq_Biofilm_16S))
                                                 , by.x = 'Sample'
                                                 , by.y = 'row.names'
                                                 )
 
 #Make plot
-Rarecurve_16S = ggplot(data = rarefaction_curve_data_summary_verbose,
+Rarecurve_16S = ggplot(data = rarefaction_curve_data_summary_verbose_16S,
   mapping = aes(x = Depth,
                 y = Alpha_diversity_mean,
                 ymin = Alpha_diversity_mean - Alpha_diversity_sd,
@@ -386,7 +386,7 @@ Rarecurve_16S = ggplot(data = rarefaction_curve_data_summary_verbose,
 Rarecurve_16S
 
 #Save plot object for later ggarrange activity
-saveRDS(Rarecurve_16S, "~/Desktop/Biofilm_project/Analysis/Clean_Thesis_Code/Figures/16S_Rarecurve.rds")
+saveRDS(Rarecurve_16S, "/YOUR/PATH/HERE/16S_Rarecurve.rds")
 
 ```
 ##rarefy 10 times, combine, and then utilise the averaged result
@@ -504,7 +504,7 @@ library(plyr)
 
 ```{r Import data}
 
-my_18S_phyloseq = readRDS("~/Desktop/Biofilm_project/Analysis/18S/R_Analysis/Phyloseq_object_18S.rds")
+my_18S_phyloseq = readRDS("/YOUR/PATH/HERE/Phyloseq_object_18S.rds")
 
 #Subset to only eukaryotic data
 my_18S_phyloseq = subset_taxa(my_18S_phyloseq, Kingdom == "Eukaryota")
@@ -522,7 +522,7 @@ Biofilm_18S = subset_samples(my_18S_phyloseq, Project == "Marine_Biofilm")
 nrow(Biofilm_18S@sam_data)
 
 #Import mapping file that contains metadata
-Mod_18S_map = read.csv("~/Desktop/Biofilm_project/Analysis/18S/R_Analysis/18S_Mapping_file.csv", row.names = 1)
+Mod_18S_map = read.csv("/YOUR/PATH/HERE/18S_Mapping_file.csv", row.names = 1)
 
 #Attach updated metadata to phyloseq object
 sample_data(Biofilm_18S) = Mod_18S_map
@@ -532,6 +532,7 @@ Phyloseq_Biofilm_18S = subset_samples(Biofilm_18S, Sample_type == "Biofilm")
 
 #Keep as back up
 Phyloseq_Biofilm_18S_v0 = Phyloseq_Biofilm_18S
+
 ```
 ##Include development stage cut offs that are later identified
 ```{r}
@@ -573,25 +574,25 @@ p + ggtitle(title) +
 ##Rarification curve generation
 ```{r}
 #Use function to calculate curve
-rarefaction_curve_data <- calculate_rarefaction_curves(Phyloseq_Biofilm_18S, c('Observed'), rep(c(1, 10, 100, 1:100 * 1000), each = 10))
+rarefaction_curve_data_18S <- calculate_rarefaction_curves(Phyloseq_Biofilm_18S, c('Observed'), rep(c(1, 10, 100, 1:100 * 1000), each = 10))
 #Summarise 
-summary(rarefaction_curve_data)
+summary(rarefaction_curve_data_18S)
 
 #Reformat data and summarise for plotting
-rarefaction_curve_data_summary <- ddply(rarefaction_curve_data, c('Depth', 'Sample', 'Measure'), summarise, Alpha_diversity_mean = mean(Alpha_diversity), Alpha_diversity_sd = sd(Alpha_diversity))
+rarefaction_curve_data_summary_18S <- ddply(rarefaction_curve_data_18S, c('Depth', 'Sample', 'Measure'), summarise, Alpha_diversity_mean = mean(Alpha_diversity), Alpha_diversity_sd = sd(Alpha_diversity))
 
 #Remove X from column and sample names to make reading easier
-colnames(rarefaction_curve_data_summary) = gsub("X","", colnames(rarefaction_curve_data_summary))
-rarefaction_curve_data_summary$Sample = gsub("X","", rarefaction_curve_data_summary$Sample)
+colnames(rarefaction_curve_data_summary_18S) = gsub("X","", colnames(rarefaction_curve_data_summary_18S))
+rarefaction_curve_data_summary_18S$Sample = gsub("X","", rarefaction_curve_data_summary_18S$Sample)
 
 #Merge phyloseq metadata and the rarefaction summary
-rarefaction_curve_data_summary_verbose <- merge(rarefaction_curve_data_summary, data.frame(sample_data(Phyloseq_Biofilm_18S))
+rarefaction_curve_data_summary_verbose_18S <- merge(rarefaction_curve_data_summary_18S, data.frame(sample_data(Phyloseq_Biofilm_18S))
                                                 , by.x = 'Sample'
                                                 , by.y = 'row.names'
                                                 )
 
 #Make plot
-Rarecurve_18S = ggplot(data = rarefaction_curve_data_summary_verbose,
+Rarecurve_18S = ggplot(data = rarefaction_curve_data_summary_verbose_18S,
   mapping = aes(x = Depth,
                 y = Alpha_diversity_mean,
                 ymin = Alpha_diversity_mean - Alpha_diversity_sd,
@@ -615,7 +616,7 @@ Rarecurve_18S = ggplot(data = rarefaction_curve_data_summary_verbose,
 Rarecurve_18S
 
 #Save plot object for later ggarrange activity
-saveRDS(Rarecurve_18S, "~/Desktop/Biofilm_project/Analysis/Clean_Thesis_Code/Figures/18S_Rarecurve.rds")
+saveRDS(Rarecurve_18S, "/YOUR/PATH/HERE/18S_Rarecurve.rds")
 
 ```
 ##rarefy 10 times, combine, and then utilise the averaged result
@@ -726,6 +727,19 @@ Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Mari
 
 
 
+
+
+
+
+#Rarification curves plotting
+```{r}
+ggarrange(Rarecurve_16S, Rarecurve_18S, common.legend = T,
+          legend = "right")
+
+tiff("/YOUR/PATH/HERE/Figures_Tables/SupplementaryFigure2_HighQual.tiff", units = "in", width = 16, height = 8, res = 300)
+last_plot()
+dev.off()
+```
 
 
 
