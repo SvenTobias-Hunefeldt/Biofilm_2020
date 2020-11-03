@@ -143,7 +143,7 @@ Summary_Time_Family_all$Mesh_status = gsub("Exposed", "Native", Summary_Time_Fam
 Summary_Time_Family_all$Mesh_status = gsub("Enclosed", "Exclusive", Summary_Time_Family_all$Mesh_status)
 
 #Extract table
-write.csv(Summary_Time_Family_all, file = "/YOUR/PATH/HERE/Figures_Table/SupplementaryTable1_AgeCorrelateFamily.csv")
+write.csv(Summary_Time_Family_all, file = "/YOUR/PATH/HERE/Figures_Table/SupplementaryTable3_AgeCorrelateFamily.csv")
 
 
 ```
