@@ -1,7 +1,7 @@
 ---
-title: "Figure 1 Richness over time"
+title: "Figure 1 and associated groupings"
 author: "Sven Tobias-Hunefeldt"
-date: "06/04/2020"
+date: "30/03/2020"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -11,1566 +11,581 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 #Set up
-Import data and refine as done using the set up script.
+Import data and refine as done using the set up script
+```{r Install ecotone assigner}
 
+install.packages("/YOUR/PATH/HERE/EcotoneFinder_0.2.0.tar.gz", repos = NULL, type = "source")
+
+```
 ```{r load packages}
 
-library(microbiome)
+library(EcotoneFinder)
+library(colorspace)
 library(Rmisc)
-library(ggplot2)
+library(reshape2)
+library(phyloseq)
 library(ggpubr)
-library(vegan)
-library(RVAideMemoire)
-library(tidyverse)
-library(tibble)
+library(ggplot2)
+library(cluster)
 
 ```
-```{r Refine colours and shapes}
-#Refine colours
-cbbPalette <- c("black",
-                "red",
-                "navy", 
-                "green", 
-                "magenta",
-                "forestgreen",
-                "turquoise")
-
-Time_colour_list = c("0" = "turquoise", 
-                     "7" = "forestgreen", 
-                     "14" = "black", 
-                     "19" = "red", 
-                     "28" = "navy", 
-                     "42" = "green", 
-                     "56" = "magenta")
-
-#Refine shape list
-Substrate_shape_list = c("Plastic" = 15, #Filled square 
-                         "Glass" = 16, #Filled circle
-                         "Tile" = 17, #Filled Triangle
-                         "Wood" = 5, #Hollow diamond
-                         "Water" = 11) #Lined star
-
-#Make colour lists
-Substrate_colour_list = c("Plastic" = "black",
-                  "Glass" = "green",
-                  "Tile" = "blue",
-                  "Wood" = "magenta")
-
-Sequencing_colours = c("Prokaryotes" = "black",
-                       "Eukaryotes" = "red")
-
-Mesh_Palette = c("Exclusive" = "#000000",
-                 "Native" = "#E69F00")
-
-```
-
-#Figure 1 A
-```{r Calculate prokaryotic alpha diversity measure}
-#Calculate richness
-alpha_summary_16S <- estimate_richness(Phyloseq_Biofilm_16S, measures = c("Observed", "Shannon"))
-#Make rownmes match with sample data
-row.names(alpha_summary_16S) =gsub("X", "", row.names(alpha_summary_16S))
-#Calculate evenness
-Evenness_16S <- evenness(Phyloseq_Biofilm_16S, 'pielou')
-#Append evenness to other diversity metrics
-alpha_summary_16S$Pielou <- Evenness_16S$pielou
-
-#Combine diveristy metrics with metadata
-Map_16S_alpha <- data.frame(alpha_summary_16S, sample_data(Phyloseq_Biofilm_16S))
-#Save diveristy metrics into phyloseq objects metadata
-sample_data(Phyloseq_Biofilm_16S) = Map_16S_alpha
-#Make sure it's worked
-Phyloseq_Biofilm_16S@sam_data
-
-#Subset diversity data to only biofilm data
-Map_16S_alpha_noA = subset(Map_16S_alpha, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
-#Ensure prokaryotic data is noted
-Map_16S_alpha_noA$Sequencing = "Prokaryotes"
-
-#Subset into biofilm phyloseq object with diversity metrics
-Phyloseq_Biofilm_16S_noA = subset_samples(Phyloseq_Biofilm_16S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
-
-```
-```{r Make prokaryotic richness plot}
-
-#Summarise for plotting
-alpha_summary_16S_Obs = summarySE(Map_16S_alpha_noA, measurevar="Observed", groupvars=c("Mesh_status", "Substrate", "Sample_time", "Sequencing"))
-
-#Exposed -> Non-enclosed
-alpha_summary_16S_Obs$Mesh_status = gsub("Exposed", "Native", alpha_summary_16S_Obs$Mesh_status)
-alpha_summary_16S_Obs$Mesh_status = gsub("Enclosed", "Exclusive", alpha_summary_16S_Obs$Mesh_status)
-
-#Substrate re-nameing
-alpha_summary_16S_Obs$Substrate = gsub("Acryl", "Plastic", alpha_summary_16S_Obs$Substrate)
-alpha_summary_16S_Obs$Substrate = gsub("Pine", "Wood", alpha_summary_16S_Obs$Substrate)
-
-#Convert and reorder for plotting
-alpha_summary_16S_Obs$Sample_time = as.factor(as.character(alpha_summary_16S_Obs$Sample_time))
-alpha_summary_16S_Obs$Sample_time = factor(alpha_summary_16S_Obs$Sample_time,
-                         levels=c("7",
-                                  "14",
-                                  "19",
-                                  "28",
-                                  "42",
-                                  "56"))
-alpha_summary_16S_Obs$Substrate = factor(alpha_summary_16S_Obs$Substrate,
-                         levels= c("Plastic",
-                                   "Glass",
-                                   "Tile",
-                                   "Wood"))
-#Make plot
-Observed_16S = ggplot(alpha_summary_16S_Obs, aes(x = Sample_time, y = Observed, colour = Substrate, group = Substrate))+
-  geom_line(lwd = 1)+
-  geom_errorbar(aes(ymin=(Observed-sd), 
-                    ymax=(Observed+sd),
-                    colour = Substrate), 
-                position=pd)+
-  facet_grid(. ~ Mesh_status)+
-  ylab("Observed Richness")+
-  xlab("Time (days)")+
-  #ylim(0,1300)+
-  scale_color_manual("Condition", values = Substrate_colour_list)+
- # scale_y_continuous(limits = c(0,1500), breaks = c(0,1000))+
-  theme_bw()+
-  My_Theme+
-  ggtitle("Prokaryotes")+
-  theme(plot.title = element_text(hjust = 0.5))
-  
-#Inspect plot
-Observed_16S
-
-```
-```{r Calculate means and sd}
-#Mean substrate
-test_mean = Map_16S_alpha_noA %>% 
-  group_by(Substrate) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-#Substarte differences
-test_mean$mean_val[3] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[4])/3)
-
-#Mean across development and enclsoure condition
-test_mean = Map_16S_alpha_noA %>% 
-  group_by(StageofBiofilm, Mesh_status) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-#Calculate difference
-test_mean$mean_val[2]-test_mean$mean_val[1]
-test_mean$mean_val[4]-test_mean$mean_val[3]
-
-#Mean substarte and enclsoure condition
-test_mean = Map_16S_alpha_noA %>% 
-  group_by(Substrate, Mesh_status) %>% 
-  dplyr::summarise(sum_val = sum(Pielou), mean_val = mean(Pielou), sd = sd(Pielou))
-print(test_mean)
-
-#Mean across developmental phases
-test_mean = Map_16S_alpha_noA %>% 
-  group_by(StageofBiofilm) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-
-#SD decrease over developmental phases
-(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[2]/test_mean$mean_val[2])
-
-#Mean over time
-test_mean = Map_16S_alpha_noA %>% 
-  group_by(Sample_time) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-
-#SD decrease over time
-(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[6]/test_mean$mean_val[6])
-```
-#Figure 1 A statistics
-```{r Set up}
-Phyloseq_Biofilm_phyloseq_T12_noA = subset_samples(Phyloseq_Biofilm_16S_noA, StageofBiofilm == "Early")
-Phyloseq_Biofilm_phyloseq_T3456_noA = subset_samples(Phyloseq_Biofilm_16S_noA, StageofBiofilm == "Late")
-
-Phyloseq_Biofilm_phyloseq_T12_noA@sam_data
-Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data
-```
-```{r Whole community}
-Map_16S_alpha_noA_Open = subset(Map_16S_alpha_noA, Mesh_status == "Exposed")
-Map_16S_alpha_noA_Encl = subset(Map_16S_alpha_noA, Mesh_status == "Enclosed")
-
-####Developmental stage####
-wilcox.test(Map_16S_alpha_noA$Observed ~ Map_16S_alpha_noA$StageofBiofilm, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Sample time####
-kruskal.test(Map_16S_alpha_noA$Observed, Map_16S_alpha_noA$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-kruskal.test(Map_16S_alpha_noA_Open$Observed, Map_16S_alpha_noA_Open$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-kruskal.test(Map_16S_alpha_noA_Encl$Observed, Map_16S_alpha_noA_Encl$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-
-####Substrate####
-kruskal.test(Map_16S_alpha_noA$Observed, Map_16S_alpha_noA$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-#Enclosed
-kruskal.test(Map_16S_alpha_noA_Encl$Observed, Map_16S_alpha_noA_Encl$Substrate, p.adjust.method = "bonferroni")
-
-#Non-enclosed
-kruskal.test(Map_16S_alpha_noA_Open$Observed, Map_16S_alpha_noA_Open$Substrate, p.adjust.method = "bonferroni")
-
-####Mesh status####
-kruskal.test(Map_16S_alpha_noA$Observed, Map_16S_alpha_noA$Mesh_status, p.adjust.method = "bonferroni")
-#Significant correlation between Mesh status and alpha diversity
-```
-```{r Early}
-####Sample time####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T12_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA@sam_data$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Substrate####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T12_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA@sam_data$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-Phyloseq_Biofilm_phyloseq_T12_noA_expo = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Mesh_status == "Exposed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T12_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-
-Phyloseq_Biofilm_phyloseq_T12_noA_enclo = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Mesh_status == "Enclosed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T12_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-####Mesh status####
-wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T12_noA@sam_data$Mesh_status, p.adjust.method = "bonferroni", conf.int = T)
-#Significant correlation between Mesh status and alpha diversity
-
-Phyloseq_Biofilm_phyloseq_T12_noA_p = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Substrate == "Pine")
-Phyloseq_Biofilm_phyloseq_T12_noA_a = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Substrate == "Acryl")
-Phyloseq_Biofilm_phyloseq_T12_noA_g = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Substrate == "Glass")
-Phyloseq_Biofilm_phyloseq_T12_noA_t = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Substrate == "Tile")
-
-wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_p@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T12_noA_p@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_a@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T12_noA_a@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_g@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T12_noA_g@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_t@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T12_noA_t@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#No significant differences
-```
-```{r Late communties}
-####Sample time####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Substrate####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-Phyloseq_Biofilm_phyloseq_T3456_noA_expo = subset_samples(Phyloseq_Biofilm_phyloseq_T3456_noA, Mesh_status == "Exposed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T3456_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T3456_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-kruskal.test(Phyloseq_Biofilm_phyloseq_T3456_noA_expo@sam_data$Pielou, Phyloseq_Biofilm_phyloseq_T3456_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-Phyloseq_Biofilm_phyloseq_T3456_noA_enclo = subset_samples(Phyloseq_Biofilm_phyloseq_T3456_noA, Mesh_status == "Enclosed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T3456_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T3456_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T3456_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T3456_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-####Mesh status####
-wilcox.test(Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T3456_noA@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant correlation between Mesh status and alpha diversity
-
-Phyloseq_Biofilm_phyloseq_T3456_noA_p = subset_samples(Phyloseq_Biofilm_phyloseq_T3456_noA, Substrate == "Pine")
-Phyloseq_Biofilm_phyloseq_T3456_noA_a = subset_samples(Phyloseq_Biofilm_phyloseq_T3456_noA, Substrate == "Acryl")
-Phyloseq_Biofilm_phyloseq_T3456_noA_g = subset_samples(Phyloseq_Biofilm_phyloseq_T3456_noA, Substrate == "Glass")
-Phyloseq_Biofilm_phyloseq_T3456_noA_t = subset_samples(Phyloseq_Biofilm_phyloseq_T3456_noA, Substrate == "Tile")
-
-wilcox.test(Phyloseq_Biofilm_phyloseq_T3456_noA_p@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T3456_noA_p@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant differences
-wilcox.test(Phyloseq_Biofilm_phyloseq_T3456_noA_a@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T3456_noA_a@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant
-wilcox.test(Phyloseq_Biofilm_phyloseq_T3456_noA_g@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T3456_noA_g@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant
-wilcox.test(Phyloseq_Biofilm_phyloseq_T3456_noA_t@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T3456_noA_t@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant
-
-```
-```{r Spearman and post-hoc}
-
-Phyloseq_Biofilm_16S_noA = subset_samples(Phyloseq_Biofilm_16S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
-
-cor.test(as.numeric(as.character(Phyloseq_Biofilm_16S_noA@sam_data$Observed)), as.numeric(as.character(Phyloseq_Biofilm_16S_noA@sam_data$Sample_time)), method = "s")
-#Significant correlation between all and Sample_time type
-
-
-####Sample stage####
-wilcox.test(Phyloseq_Biofilm_16S_noA@sam_data$Observed ~ Phyloseq_Biofilm_16S_noA@sam_data$StageofBiofilm, p.adjust.method = "bonferroni")
-
-####Sample time####
-pairwise.wilcox.test(Map_16S_alpha_noA$Observed, Map_16S_alpha_noA$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Substrate####
-pairwise.wilcox.test(Phyloseq_Biofilm_16S_noA@sam_data$Observed, Phyloseq_Biofilm_16S_noA@sam_data$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-#Substrate with mesh status
-Phyloseq_Biofilm_phyloseq_T12_noA_encl = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Mesh_status == "Enclosed")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_encl @sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA_encl @sam_data$Substrate, p.adjust.method = "bonferroni")
-
-Phyloseq_Biofilm_phyloseq_T12_noA_expo = subset_samples(Phyloseq_Biofilm_phyloseq_T12_noA, Mesh_status == "Exposed")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T12_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T12_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-```
-
-
-
-
-#Figure 1 B
-```{r Calculate Eukaryotic alpha diversity measure}
-#Calculate richness
-alpha_summary_18S <- estimate_richness(Phyloseq_Biofilm_18S, measures = c("Observed", "Shannon"))
-#Make rownmes match with sample data
-row.names(alpha_summary_18S) =gsub("X", "", row.names(alpha_summary_18S))
-#Calculate evenness
-Evenness_18S <- evenness(Phyloseq_Biofilm_18S, 'pielou')
-#Append evenness to other diversity metrics
-alpha_summary_18S$Pielou <- Evenness_18S$pielou
-
-#Combine diveristy metrics with metadata
-Map_18S_alpha <- data.frame(alpha_summary_18S, sample_data(Phyloseq_Biofilm_18S))
-#Save diveristy metrics into phyloseq objects metadata
-sample_data(Phyloseq_Biofilm_18S) = Map_18S_alpha
-#Make sure it's worked
-Phyloseq_Biofilm_18S@sam_data
-
-#Subset diversity data to only biofilm data
-Map_18S_alpha_noA = subset(Map_18S_alpha, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
-#Ensure Eukaryotic data is noted
-Map_18S_alpha_noA$Sequencing = "Eukaryotes"
-
-#Subset into biofilm phyloseq object with diversity metrics
-Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
-
-```
-```{r Make eukaryotic richness plot}
-
-#Sumamrise for plotting
-alpha_summary_18S_Obs = summarySE(Map_18S_alpha_noA, measurevar="Observed", groupvars=c("Mesh_status", "Substrate", "Sample_time", "Sequencing"))
-
-#Exposed -> Non-enclosed
-alpha_summary_18S_Obs$Mesh_status = gsub("Exposed", "Native", alpha_summary_18S_Obs$Mesh_status)
-alpha_summary_18S_Obs$Mesh_status = gsub("Enclosed", "Exclusive", alpha_summary_18S_Obs$Mesh_status)
-
-#Substrate re-nameing
-alpha_summary_18S_Obs$Substrate = gsub("Acryl", "Plastic", alpha_summary_18S_Obs$Substrate)
-alpha_summary_18S_Obs$Substrate = gsub("Pine", "Wood", alpha_summary_18S_Obs$Substrate)
-
-#Convert and reorder for plotting
-alpha_summary_18S_Obs$Sample_time = as.factor(as.character(alpha_summary_18S_Obs$Sample_time))
-alpha_summary_18S_Obs$Sample_time = factor(alpha_summary_18S_Obs$Sample_time,
-                         levels=c("7",
-                                  "14",
-                                  "19",
-                                  "28",
-                                  "42",
-                                  "56"))
-alpha_summary_18S_Obs$Substrate = factor(alpha_summary_18S_Obs$Substrate,
-                         levels= c("Plastic",
-                                   "Glass",
-                                   "Tile",
-                                   "Wood"))
-#Make plot
-Observed_18S = ggplot(alpha_summary_18S_Obs, aes(x = Sample_time, y = Observed, colour = Substrate, group = Substrate))+
-  geom_line(lwd = 1)+
-  geom_errorbar(aes(ymin=(Observed-sd), 
-                    ymax=(Observed+sd),
-                    colour = Substrate), 
-                position=pd)+
-  facet_grid(. ~ Mesh_status)+
-  ylab("Observed Richness")+
-  xlab("Time (days)")+
-  #ylim(0,1300)+
-  scale_color_manual("Condition", values = Substrate_colour_list)+
-  #scale_y_continuous(limits = c(0,600), breaks = c(0, 400))+
-  theme_bw()+
-  My_Theme+
-  ggtitle("Eukaryotes")+
-  theme(plot.title = element_text(hjust = 0.5))
-
-#Inspect plot
-Observed_18S
-
-```
-```{r Calculate means and sd}
-#Mean substrate
-test_mean = Map_18S_alpha_noA %>% 
-  group_by(Substrate) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-#Substarte differences
-test_mean$mean_val[3] - ((test_mean$mean_val[1] +test_mean$mean_val[2] + test_mean$mean_val[4])/3)
-
-#Mean across development and enclsoure condition
-test_mean = Map_18S_alpha_noA %>% 
-  group_by(StageofBiofilm, Mesh_status) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-#Calculate difference
-test_mean$mean_val[2]-test_mean$mean_val[1]
-test_mean$mean_val[4]-test_mean$mean_val[3]
-
-#Mean substarte and enclsoure condition
-test_mean = Map_18S_alpha_noA %>% 
-  group_by(Substrate, Mesh_status) %>% 
-  dplyr::summarise(sum_val = sum(Pielou), mean_val = mean(Pielou), sd = sd(Pielou))
-print(test_mean)
-
-#Mean across developmental phases
-test_mean = Map_18S_alpha_noA %>% 
-  group_by(StageofBiofilm) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-
-#SD decrease over developmental phases
-(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[2]/test_mean$mean_val[2])
-
-#Mean over time
-test_mean = Map_18S_alpha_noA %>% 
-  group_by(Sample_time) %>% 
-  dplyr::summarise(mean_val = mean(Observed), sd = sd(Observed))
-print(test_mean)
-
-#SD decrease over time
-(test_mean$sd[1]/test_mean$mean_val[1])-(test_mean$sd[6]/test_mean$mean_val[6])
-```
-#Figure 1 B statistics
-```{r Set up}
-Phyloseq_Biofilm_phyloseq_T1_noA = subset_samples(Phyloseq_Biofilm_18S_noA, StageofBiofilm == "Early")
-Phyloseq_Biofilm_phyloseq_T23456_noA = subset_samples(Phyloseq_Biofilm_18S_noA, StageofBiofilm == "Late")
-
-Phyloseq_Biofilm_phyloseq_T1_noA@sam_data
-Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data
-```
-```{r Whole community}
-Map_18S_alpha_noA_Open = subset(Map_18S_alpha_noA, Mesh_status == "Exposed")
-Map_18S_alpha_noA_Encl = subset(Map_18S_alpha_noA, Mesh_status == "Enclosed")
-
-####Developmental stage####
-wilcox.test(Map_18S_alpha_noA$Observed ~ Map_18S_alpha_noA$StageofBiofilm, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Sample time####
-kruskal.test(Map_18S_alpha_noA$Observed, Map_18S_alpha_noA$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-kruskal.test(Map_18S_alpha_noA_Open$Observed, Map_18S_alpha_noA_Open$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-kruskal.test(Map_18S_alpha_noA_Encl$Observed, Map_18S_alpha_noA_Encl$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-
-####Substrate####
-kruskal.test(Map_18S_alpha_noA$Observed, Map_18S_alpha_noA$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-####Mesh status####
-kruskal.test(Map_18S_alpha_noA$Observed, Map_18S_alpha_noA$Mesh_status, p.adjust.method = "bonferroni")
-#Significant correlation between Mesh status and alpha diversity
-```
-```{r Early communities}
-####Sample time####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T1_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA@sam_data$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Substrate####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T1_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA@sam_data$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-Phyloseq_Biofilm_phyloseq_T1_noA_expo = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Mesh_status == "Exposed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T1_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-Phyloseq_Biofilm_phyloseq_T1_noA_enclo = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Mesh_status == "Enclosed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T1_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-####Mesh status####
-wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T1_noA@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant correlation between Mesh status and alpha diversity
-
-Phyloseq_Biofilm_phyloseq_T1_noA_p = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Substrate == "Pine")
-Phyloseq_Biofilm_phyloseq_T1_noA_a = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Substrate == "Acryl")
-Phyloseq_Biofilm_phyloseq_T1_noA_g = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Substrate == "Glass")
-Phyloseq_Biofilm_phyloseq_T1_noA_t = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Substrate == "Tile")
-
-wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_p@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T1_noA_p@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_a@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T1_noA_a@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_g@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T1_noA_g@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_t@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T1_noA_t@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#No significant differences
-```
-```{r Late communties}
-####Sample time####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Substrate####
-kruskal.test(Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-Phyloseq_Biofilm_phyloseq_T23456_noA_expo = subset_samples(Phyloseq_Biofilm_phyloseq_T23456_noA, Mesh_status == "Exposed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T23456_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T23456_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T23456_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-Phyloseq_Biofilm_phyloseq_T23456_noA_enclo = subset_samples(Phyloseq_Biofilm_phyloseq_T23456_noA, Mesh_status == "Enclosed")
-kruskal.test(Phyloseq_Biofilm_phyloseq_T23456_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T23456_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA_enclo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T23456_noA_enclo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-####Mesh status####
-wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T23456_noA@sam_data$Mesh_status, p.adjust.method = "bonferroni", conf.int = T)
-#Significant correlation between Mesh status and alpha diversity
-
-Phyloseq_Biofilm_phyloseq_T23456_noA_p = subset_samples(Phyloseq_Biofilm_phyloseq_T23456_noA, Substrate == "Pine")
-Phyloseq_Biofilm_phyloseq_T23456_noA_a = subset_samples(Phyloseq_Biofilm_phyloseq_T23456_noA, Substrate == "Acryl")
-Phyloseq_Biofilm_phyloseq_T23456_noA_g = subset_samples(Phyloseq_Biofilm_phyloseq_T23456_noA, Substrate == "Glass")
-Phyloseq_Biofilm_phyloseq_T23456_noA_t = subset_samples(Phyloseq_Biofilm_phyloseq_T23456_noA, Substrate == "Tile")
-
-wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA_p@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T23456_noA_p@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant differences
-wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA_a@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T23456_noA_a@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant
-wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA_g@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T23456_noA_g@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant
-wilcox.test(Phyloseq_Biofilm_phyloseq_T23456_noA_t@sam_data$Observed ~ Phyloseq_Biofilm_phyloseq_T23456_noA_t@sam_data$Mesh_status, p.adjust.method = "bonferroni")
-#Significant
-
-```
-```{r Spearman and post-hoc}
-
-Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
-
-cor.test(as.numeric(as.character(Phyloseq_Biofilm_18S_noA@sam_data$Observed)), as.numeric(as.character(Phyloseq_Biofilm_18S_noA@sam_data$Sample_time)), method = "s")
-#Significant correlation between all and Sample_time type
-
-
-####Sample stage####
-wilcox.test(Phyloseq_Biofilm_18S_noA@sam_data$Observed ~ Phyloseq_Biofilm_18S_noA@sam_data$StageofBiofilm, p.adjust.method = "bonferroni")
-
-####Sample time####
-pairwise.wilcox.test(Map_18S_alpha_noA$Observed, Map_18S_alpha_noA$Sample_time, p.adjust.method = "bonferroni")
-#Significant correlation between all and Sample_time type
-
-####Substrate####
-pairwise.wilcox.test(Phyloseq_Biofilm_18S_noA@sam_data$Observed, Phyloseq_Biofilm_18S_noA@sam_data$Substrate, p.adjust.method = "bonferroni")
-#Significant correlation between evenness and substrate type - interesting
-
-#Substrate with mesh status
-Phyloseq_Biofilm_phyloseq_T1_noA_encl = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Mesh_status == "Enclosed")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_encl @sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA_encl @sam_data$Substrate, p.adjust.method = "bonferroni")
-
-Phyloseq_Biofilm_phyloseq_T1_noA_expo = subset_samples(Phyloseq_Biofilm_phyloseq_T1_noA, Mesh_status == "Exposed")
-pairwise.wilcox.test(Phyloseq_Biofilm_phyloseq_T1_noA_expo@sam_data$Observed, Phyloseq_Biofilm_phyloseq_T1_noA_expo@sam_data$Substrate, p.adjust.method = "bonferroni")
-
-```
-
-
-#Figure 1 C
-##Plotting and means
-```{r Extract and run prokayotic comparisons}
-#Get pristine verison of phyloseq
+#Set up dataframes for ecotone divider
+##Prokaryotes
+```{r Prokaryotes}
+
+#Restore a pristine copy from back up
 Phyloseq_Biofilm_16S = Phyloseq_Biofilm_16S_v0
 
-#Extract otu table
-OTU1 = as(otu_table(Phyloseq_Biofilm_16S), "matrix")
+#Look otu table and metadata, are they mergable?
+rownames(Phyloseq_Biofilm_16S@sam_data)
+rownames(Phyloseq_Biofilm_16S@otu_table)
+#Merge them
+OTU_Meta_df_16S = merge(Phyloseq_Biofilm_16S@sam_data, Phyloseq_Biofilm_16S@otu_table, by = 0)
+#Reorder factors for downstream analysis
+OTU_Meta_df_16S$Sample_time = factor(OTU_Meta_df_16S$Sample_time, 
+                                    levels = c("0", "7", "14", "19", "28", "42", "56"))
 
-#Make sure rows are samples and columns are the different taxa (ASVs in this case)
-if(taxa_are_rows(Phyloseq_Biofilm_16S)){OTU1 <- t(OTU1)}
+#Subset merged dataframe
+JustBiofilm_test = subset(OTU_Meta_df_16S, Substrate == "Acryl" | Substrate == "Glass" | Substrate == "Tile" | Substrate == "Pine")
 
-#Convert to a dataframe for later manipulation
-OTUdf = as.data.frame(OTU1)
+#Assign informative rownames to dataframe
+rownames(JustBiofilm_test) = JustBiofilm_test$Row.names
+#Check dataframe to see what needs removing
+JustBiofilm_test[c(1:5), c(1:20)]
+#Remove excess information
+JustBiofilm_test[,c(1:12,14,15)] = NULL #Only keep sample time
+#Check dataframe to see if it worked
+JustBiofilm_test[c(1:5), c(1:20)]
+#Melt into long format
+JustBiofilm_long = melt(JustBiofilm_test, id.vars = "Sample_time")
+#Check for errors
+JustBiofilm_long[c(1:239), c(1:3)]
 
-#Run bray dissimilarity matrix - we want quantitative hence we turn off binary
-Braydf = vegdist(OTUdf, method = "bray", binary = FALSE)
+#Identify type of variable for downstream anlysis
+typeof(JustBiofilm_long$Sample_time)
+typeof(JustBiofilm_long$variable)
+typeof(JustBiofilm_long$value)
+#Change data type for easier analysis
+JustBiofilm_long$Sample_time = as.numeric(as.character(JustBiofilm_long$Sample_time))
+JustBiofilm_long$variable = as.factor(as.character(JustBiofilm_long$variable))
+JustBiofilm_long$value = as.numeric(as.character(JustBiofilm_long$value))
+#Check to see if it worked
+typeof(JustBiofilm_long$Sample_time)
+typeof(JustBiofilm_long$variable)
+typeof(JustBiofilm_long$value)
 
-#write.csv(as.matrix(Braydf), "Bray_Diss_16S.csv")
+#Make summary for identify trends
+JustBiofilm_summary = summarySE(JustBiofilm_long, measurevar = "value", groupvars = c("Sample_time", "variable"))
+#Check for errors
+JustBiofilm_summary[c(1:100), c(1:7)]
+test = "ASV3"
+filter(JustBiofilm_summary, JustBiofilm_summary$variable %in% test)
+
+#Convert data back into a wide format
+JustBiofilm_wide_16S = reshape2::dcast(JustBiofilm_summary, Sample_time ~ variable, value.var = "value")
+#Check for error
+JustBiofilm_wide_16S[c(1:7), c(1:100)]
+
+#Change names for downstream analysis
+colnames(JustBiofilm_wide_16S) = gsub("ASV", "Sp.", colnames(JustBiofilm_wide_16S))
+colnames(JustBiofilm_wide_16S) = gsub("Sample_time", "Distance", colnames(JustBiofilm_wide_16S))
+#Check for errors
+JustBiofilm_wide_16S[c(1:7), c(1:100)]
+#Redefine for easier analysis
+JustBiofilm_wide_16S$Distance <- factor(JustBiofilm_wide_16S$Distance,
+                         levels=(unique(JustBiofilm_wide_16S$Distance)))
 
 ```
-```{r Reformat prokaryotic for downstream analysis}
+##Eukaryotes
+```{r Eukaryotes}
 
-#Make into readable form (wide)
-Braydf_wide = as.data.frame(as.matrix(Braydf))
-Braydf_wide$Sample_ID = rownames(as.data.frame(as.matrix(Braydf))) #Make rownames another column
-colnames(Braydf_wide) #Check to make sure rename worked
-Braydf_long = reshape2::melt(Braydf_wide, id.vars = "Sample_ID") #Make df into long format
-
-#Rename y axis so more meaningful
-colnames(Braydf_long)[3] <- "Bray_dissimilarity"
-colnames(Braydf_long)[2] <- "Var2" 
-colnames(Braydf_long)[1] <- "Var1" 
-
-
-#Remove self-comparisons
-Braydf_long = Braydf_long %>%
-    dplyr::filter(as.character(Var1) != as.character(Var2)) %>%
-    dplyr::mutate_if(is.factor,
-              as.character)
-Temporary_df = Braydf_long 
-
-#remove replicate information
-Temporary_df$Var1 = gsub("za","", Temporary_df$Var1)
-Temporary_df$Var1 = gsub("zb","", Temporary_df$Var1)
-Temporary_df$Var1 = gsub("zc","", Temporary_df$Var1)
-Temporary_df$Var1 = gsub("zd","", Temporary_df$Var1)
-
-#Determine source of sample
-Temporary_df$Substrate = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("p", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Pine"
-} else if (grepl("a", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Acryl"
-} else if (grepl("g", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Glass"
-} else if (grepl("t", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Tile"
-} else if (grepl("me", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Mesh"
-} else if (grepl("ws", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Water"
-}
-  i=i+1
-}
-
-#Determine when sample was collected
-Temporary_df$Sample_time = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("0", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "0"
-} else if (grepl("1", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "7"
-} else if (grepl("2", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "14"
-} else if (grepl("3", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "19"
-} else if (grepl("4", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "28"
-} else if (grepl("5", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "42"
-} else if (grepl("6", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "56"
-}
-  i=i+1
-}
-
-#Determine enclosure status of sample
-Temporary_df$Mesh_status = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("e", Temporary_df$Var1[i]) == T){
-  Temporary_df$Mesh_status[i] = "Non-enclosed"
-} else if (grepl("m", Temporary_df$Var1[i]) == T){
-  Temporary_df$Mesh_status[i] = "Enclosed"
-} else if (grepl("ws", Temporary_df$Var1[i]) == T){
-  Temporary_df$Mesh_status[i] = "Water"
-}
-  i=i+1
-}
-
-Temporary_df$StageofBiofilm = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("1", Temporary_df$Var1[i]) == T | grepl("2", Temporary_df$Var1[i]) == T){
-  Temporary_df$StageofBiofilm[i] = "Early"
-} else if (grepl("3", Temporary_df$Var1[i]) == T | grepl("4", Temporary_df$Var1[i]) == T | grepl("5", Temporary_df$Var1[i]) == T | grepl("6", Temporary_df$Var1[i]) == T){
-  Temporary_df$StageofBiofilm[i] = "Late"
-} 
-  i=i+1
-}
-
-Temporary_df_16S_v0 = Temporary_df
-Temporary_df_16S = Temporary_df_16S_v0
-```
-```{r Extract and run rukayotic comparisons}
-#Get pristine verison of phyloseq
+#Restore a pristine copy from back up
 Phyloseq_Biofilm_18S = Phyloseq_Biofilm_18S_v0
 
+#Look otu table and metadata, are they mergable?
+rownames(Phyloseq_Biofilm_18S@sam_data)
+rownames(Phyloseq_Biofilm_18S@otu_table)
+#Merge them
+OTU_Meta_df_18S = merge(Phyloseq_Biofilm_18S@sam_data, Phyloseq_Biofilm_18S@otu_table, by = 0)
+#Reorder factors for downstream analysis
+OTU_Meta_df_18S$Sample_time = factor(OTU_Meta_df_18S$Sample_time, 
+                                    levels = c("0", "7", "14", "19", "28", "42", "56"))
+
+#Subset merged dataframe
+JustBiofilm_test = subset(OTU_Meta_df_18S, Substrate == "Acryl" | Substrate == "Glass" | Substrate == "Tile" | Substrate == "Pine")
+
+#Assign informative rownames to dataframe
+rownames(JustBiofilm_test) = JustBiofilm_test$Row.names
+#Check dataframe to see what needs removing
+JustBiofilm_test[c(1:5), c(1:20)]
+#Remove excess information
+JustBiofilm_test[,c(1:12,14,15)] = NULL #Only keep sample time
+#Check dataframe to see if it worked
+JustBiofilm_test[c(1:5), c(1:20)]
+#Melt into long format
+JustBiofilm_long = melt(JustBiofilm_test, id.vars = "Sample_time")
+#Check for errors
+JustBiofilm_long[c(1:239), c(1:3)]
+
+#Identify type of variable for downstream anlysis
+typeof(JustBiofilm_long$Sample_time)
+typeof(JustBiofilm_long$variable)
+typeof(JustBiofilm_long$value)
+#Change data type for easier analysis
+JustBiofilm_long$Sample_time = as.numeric(as.character(JustBiofilm_long$Sample_time))
+JustBiofilm_long$variable = as.factor(as.character(JustBiofilm_long$variable))
+JustBiofilm_long$value = as.numeric(as.character(JustBiofilm_long$value))
+#Check to see if it worked
+typeof(JustBiofilm_long$Sample_time)
+typeof(JustBiofilm_long$variable)
+typeof(JustBiofilm_long$value)
+
+#Make summary for identify trends
+JustBiofilm_summary = summarySE(JustBiofilm_long, measurevar = "value", groupvars = c("Sample_time", "variable"))
+#Check for errors
+JustBiofilm_summary[c(1:100), c(1:7)]
+test = "ASV3"
+filter(JustBiofilm_summary, JustBiofilm_summary$variable %in% test)
+
+#Convert data back into a wide format
+JustBiofilm_wide_18S = reshape2::dcast(JustBiofilm_summary, Sample_time ~ variable, value.var = "value")
+#Check for error
+JustBiofilm_wide_18S[c(1:7), c(1:100)]
+
+#Change names for downstream analysis
+colnames(JustBiofilm_wide_18S) = gsub("ASV", "Sp.", colnames(JustBiofilm_wide_18S))
+colnames(JustBiofilm_wide_18S) = gsub("Sample_time", "Distance", colnames(JustBiofilm_wide_18S))
+#Check for errors
+JustBiofilm_wide_18S[c(1:7), c(1:100)]
+#Redefine for easier analysis
+JustBiofilm_wide_18S$Distance <- factor(JustBiofilm_wide_18S$Distance,
+                         levels=(unique(JustBiofilm_wide_18S$Distance)))
+
+```
+
+#Run analyses for ecotone divider
+```{r Make palette}
+mock.df = data.frame(Dissimilarity = c(0,
+                                       100),
+                     Sample = c(1,
+                                2),
+                     ygroup = c(100,
+                                10))
+heatmap(mock.df, aes(x = as.numeric(Sample), y = ygroup, fill = Dissimilarity))+
+  geom_tile()+
+  scale_color_continuous(values())
+
+```
+
+##Prokaryotes
+```{r}
+library("RColorBrewer")
+col <- colorRampPalette(brewer.pal(8, "Dark2"))(256)
+
+#Identify best number of clusters
+DistEco(data = type.convert(JustBiofilm_wide_16S[,-1]),
+        distance.method = "sorensen",
+        transpose = F, #Calculate groups as sites
+        spinglass = T, #Use spinglass algorithm to produce statistical groups for the network
+        plot = "heatmap",
+        run = 10, #How often to repeat the spinglass algorithm
+        spinglass.groups = c("raw")) #The type of grouping to use from the results of the spinglass algorithm
+
+
+tiff("/YOUR/PATH/HERE/Figures_Tables/ProkHeat.tiff", height = 6.1, width = 8, units = "in", res = 300)
+DistEco(data = type.convert(JustBiofilm_wide_16S[,-1]),
+        distance.method = "sorensen",
+        transpose = F, #Calculate groups as sites
+        spinglass = T, #Use spinglass algorithm to produce statistical groups for the network
+        plot = "heatmap",
+        run = 10, #How often to repeat the spinglass algorithm
+        spinglass.groups = c("raw")) #The type of grouping to use from the results of the spinglass algorithm
+dev.off()
+
+DistEco(data = type.convert(JustBiofilm_wide_16S[,-1]),
+        distance.method = "sorensen",
+        transpose = F, #Calculate groups as sites
+        spinglass = T, #Use spinglass algorithm to produce statistical groups for the network
+        plot = "network",
+        run = 1000, #How often to repeat the spinglass algorithm
+        spinglass.groups = c("raw")) #The type of grouping to use from the results of the spinglass algorithm
+
+#### 2 cluster Analyses####
+SyntheticEcoFinder_2_16S <- EcotoneFinder(data = type.convert(JustBiofilm_wide_16S[,-1]),
+                                     dist = type.convert(JustBiofilm_wide_16S$Distance),
+                                     method = "vegclust",
+                                     groups = 2, 
+                                     standardize = "hellinger",
+                                     diversity = "all")
+#Extract useful info for plotting
+Forplot_2_16S = SyntheticEcoFinder_2_16S$vegclust$memb
+#Generate plot
+Plot_2_16S_eco = ggplot(Forplot_2_16S, 
+                    aes(x = as.factor(c(7, 14, 19, 28, 42, 56))))+
+  geom_line(aes(y = M1, 
+                colour = "red", 
+                group = "M1"), size = 2)+
+  geom_line(aes( y = M2, 
+                 colour = "magenta", 
+                 group = "M2"), size = 2)+
+  xlab("Time (days)")+
+  ylab("Ecological gradient based \non Fuzzy Cluster Means")+
+  theme_bw()+
+  My_Theme+
+  theme(axis.text.y = element_blank(),
+        legend.position = "none")
+#Check plot
+Plot_2_16S_eco
+
+
+#### 3 cluster Analyses####
+SyntheticEcoFinder_3_16S <- EcotoneFinder(data = type.convert(JustBiofilm_wide_16S[,-1]),
+                                     dist = type.convert(JustBiofilm_wide_16S$Distance),
+                                     method = "vegclust",
+                                     groups = 3, 
+                                     standardize = "hellinger",
+                                     diversity = "all")
+#Extract useful info for plotting
+Forplot_3_16S = SyntheticEcoFinder_3_16S$vegclust$memb
+#Generate plot
+Plot_3_16S = ggplot(Forplot_3_16S, 
+                    aes(x = as.factor(c(7, 14, 19, 28, 42, 56))))+
+  geom_line(aes(y = M1, 
+                colour = "red", 
+                group = "M1"), size = 2)+
+  geom_line(aes( y = M2, 
+                 colour = "green", 
+                 group = "M2"), size = 2)+
+  geom_line(aes( y = M3, 
+                 colour = "magenta", 
+                 group = "M3"), size = 2)+
+  xlab("Time (days)")+
+  ylab("Ecological gradient based \non Fuzzy Cluster Means")+
+  theme_bw()+
+  My_Theme+
+  theme(axis.text.y = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+#Check plot
+Plot_3_16S
+
+
+#### 4 cluster Analyses####
+SyntheticEcoFinder_4_16S <- EcotoneFinder(data = type.convert(JustBiofilm_wide_16S[,-1]),
+                                     dist = type.convert(JustBiofilm_wide_16S$Distance),
+                                     method = "vegclust",
+                                     groups = 4, 
+                                     standardize = "hellinger",
+                                     diversity = "all")
+#Extract useful info for plotting
+Forplot_4_16S = SyntheticEcoFinder_4_16S$vegclust$memb
+#Generate plot
+Plot_4_16S = ggplot(Forplot_4_16S, 
+                    aes(x = as.factor(c(7, 14, 19, 28, 42, 56))))+
+  geom_line(aes(y = M1, 
+                colour = "red", 
+                group = "M1"), size = 2)+
+  geom_line(aes( y = M2, 
+                 colour = "green", 
+                 group = "M2"), size = 2)+
+  geom_line(aes( y = M3, 
+                 colour = "magenta", 
+                 group = "M3"), size = 2)+
+    geom_line(aes( y = M4, 
+                 colour = "blue", 
+                 group = "M4"), size = 2)+
+  xlab("Time (days)")+
+  ylab("Ecological gradient based \non Fuzzy Cluster Means")+
+  theme_bw()+
+  My_Theme+
+  theme(axis.text.y = element_blank(),
+        legend.position = "none")
+#Check plot
+Plot_4_16S
+
+```
+##Eukaryotes
+```{r}
+#Identify best number of clusters
+DistEco(data = type.convert(JustBiofilm_wide_18S[,-1]),
+        distance.method = "sorensen",
+        transpose = F, #Calculate groups as sites
+        spinglass = T, #Use spinglass algorithm to produce statistical groups for the network
+        plot = "heatmap",
+        run = 10, #How often to repeat the spinglass algorithm
+        spinglass.groups = c("raw")) #The type of grouping to use from the results of the spinglass algorithm
+
+tiff("/Volumes/Lab_book/Biofilm_project/Analysis/Clean_ms_code/Reanalysis/Figures_Tables/EukHeat.tiff", height = 6.1, width = 8, units = "in", res = 300)
+DistEco(data = type.convert(JustBiofilm_wide_18S[,-1]),
+        distance.method = "sorensen",
+        transpose = F, #Calculate groups as sites
+        spinglass = T, #Use spinglass algorithm to produce statistical groups for the network
+        plot = "heatmap",
+        run = 10, #How often to repeat the spinglass algorithm
+        spinglass.groups = c("raw")) #The type of grouping to use from the results of the spinglass algorithm
+dev.off()
+
+DistEco(data = type.convert(JustBiofilm_wide_18S[,-1]),
+        distance.method = "sorensen",
+        transpose = F, #Calculate groups as sites
+        spinglass = T, #Use spinglass algorithm to produce statistical groups for the network
+        plot = "network",
+        run = 100, #How often to repeat the spinglass algorithm
+        spinglass.groups = c("raw")) #The type of grouping to use from the results of the spinglass algorithm
+
+#### 2 cluster Analyses####
+SyntheticEcoFinder_2_18S <- EcotoneFinder(data = type.convert(JustBiofilm_wide_18S[,-1]),
+                                     dist = type.convert(JustBiofilm_wide_18S$Distance),
+                                     method = "vegclust",
+                                     groups = 2, 
+                                     standardize = "hellinger",
+                                     diversity = "all")
+#Extract useful info for plotting
+Forplot_2_18S = SyntheticEcoFinder_2_18S$vegclust$memb
+#Generate plot
+Plot_2_18S_eco = ggplot(Forplot_2_18S, 
+                    aes(x = as.factor(c(7, 14, 19, 28, 42, 56))))+
+  geom_line(aes(y = M1, 
+                colour = "red", 
+                group = "M1"), size = 2)+
+  geom_line(aes( y = M2, 
+                 colour = "magenta", 
+                 group = "M2"), size = 2)+
+  xlab("Time (days)")+
+  ylab("Ecological gradient based on Fuzzy Cluster Means")+
+  theme_bw()+
+  My_Theme+
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        legend.position = "none")
+#Check plot
+Plot_2_18S_eco
+
+
+#### 3 cluster Analyses####
+SyntheticEcoFinder_3_18S <- EcotoneFinder(data = type.convert(JustBiofilm_wide_18S[,-1]),
+                                     dist = type.convert(JustBiofilm_wide_18S$Distance),
+                                     method = "vegclust",
+                                     groups = 3, 
+                                     standardize = "hellinger",
+                                     diversity = "all")
+#Extract useful info for plotting
+Forplot_3_18S = SyntheticEcoFinder_3_18S$vegclust$memb
+#Generate plot
+Plot_3_18S = ggplot(Forplot_3_18S, 
+                    aes(x = as.factor(c(7, 14, 19, 28, 42, 56))))+
+  geom_line(aes(y = M1, 
+                colour = "red", 
+                group = "M1"), size = 2)+
+  geom_line(aes( y = M2, 
+                 colour = "green", 
+                 group = "M2"), size = 2)+
+  geom_line(aes( y = M3, 
+                 colour = "magenta", 
+                 group = "M3"), size = 2)+
+  xlab("Time (days)")+
+  ylab("Ecological gradient based on Fuzzy Cluster Means")+
+  theme_bw()+
+  My_Theme+
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+#Check plot
+Plot_3_18S
+
+
+#### 4 cluster Analyses####
+SyntheticEcoFinder_4_18S <- EcotoneFinder(data = type.convert(JustBiofilm_wide_18S[,-1]),
+                                     dist = type.convert(JustBiofilm_wide_18S$Distance),
+                                     method = "vegclust",
+                                     groups = 4, 
+                                     standardize = "hellinger",
+                                     diversity = "all")
+#Extract useful info for plotting
+Forplot_4_18S = as.data.frame(SyntheticEcoFinder_4_18S$vegclust$memb)
+#Generate plot
+Plot_4_18S = ggplot(Forplot_4_18S, 
+                    aes(x = as.factor(c(7, 14, 19, 28, 42, 56))))+
+  geom_line(aes(y = M1, 
+                colour = "red", 
+                group = "M1"), size = 2)+
+  geom_line(aes( y = M2, 
+                 colour = "green", 
+                 group = "M2"), size = 2)+
+  geom_line(aes( y = M3, 
+                 colour = "magenta", 
+                 group = "M3"), size = 2)+
+    geom_line(aes( y = M4, 
+                 colour = "blue", 
+                 group = "M4"), size = 2)+
+  xlab("Time (days)")+
+  ylab("Ecological gradient based on Fuzzy Cluster Means")+
+  theme_bw()+
+  My_Theme+
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        legend.position = "none")
+#Check plot
+Plot_4_18S
+
+```
+#Prokaryotic silhouette analysis
+Two clusters shows the lowest number of samples below 0 (9 vs 3's 10) while also retaining a high intra-group value
+```{r}
+
+#Restore a pristine copy from back up
+Phyloseq_Biofilm_16S = Phyloseq_Biofilm_16S_v0
+
+#Subset to only substrate associated biofilms
+Phyloseq_Biofilm_16S_noA = subset_samples(Phyloseq_Biofilm_16S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
+
 #Extract otu table
-OTU1 = as(otu_table(Phyloseq_Biofilm_18S), "matrix")
+otutable_df_16S = as.data.frame(as.matrix(otu_table(Phyloseq_Biofilm_16S_noA)))
+nrow(otutable_df_16S)
 
-#Make sure rows are samples and columns are the different taxa (ASVs in this case)
-if(taxa_are_rows(Phyloseq_Biofilm_18S)){OTU1 <- t(OTU1)}
+#2 clusters
+test2_16S = pam(otutable_df_16S, k = 2)
+Plot2_16S = recordPlot(plot(silhouette(test2_16S)))
+#This shows minimal number of misclassified samples
 
-#Convert to a dataframe for later manipulation
-OTUdf = as.data.frame(OTU1)
+#Save figure
+tiff("/YOUR/PATH/HERE/Figures_Tables/SupplementaryFigure1msC_ProkaryoticSilhouette.tiff", height = 6.66, width = 8, units = "in", res = 300)
+test2_16S = pam(otutable_df_16S, k = 2)
+Plot2_16S = recordPlot(plot(silhouette(test2_16S)))
+dev.off()
 
-#Run bray dissimilarity matrix - we want quantitative hence we turn off binary
-Braydf = vegdist(OTUdf, method = "bray", binary = FALSE)
+test2_16S$clustering[test2_16S$clustering == 1]
+31/111 #Proportion that is from day 7 and 14
 
-#write.csv(as.matrix(Braydf), "Bray_Diss_18S.csv")
+test2_16S$clustering[test2_16S$clustering == 2]
+9/12 #Proportion that is from day 7 and 14
 
-```
-```{r Reformat eukaryotic for downstream analysis}
+#3 clusters
+test3_16S = pam(otutable_df_16S, k = 3)
+Plot3_16S = recordPlot(plot(silhouette(test3_16S)))
 
-#Make into readable form (wide)
-Braydf_wide = as.data.frame(as.matrix(Braydf))
-Braydf_wide$Sample_ID = rownames(as.data.frame(as.matrix(Braydf))) #Make rownames another column
-colnames(Braydf_wide) #Check to make sure rename worked
-Braydf_long = reshape2::melt(Braydf_wide, id.vars = "Sample_ID") #Make df into long format
+test3_16S$clustering[test3_16S$clustering == 1]
+25/100 #Rest is made up of other mix of samples
 
-#Rename y axis so more meaningful
-colnames(Braydf_long)[3] <- "Bray_dissimilarity"
-colnames(Braydf_long)[2] <- "Var2" 
-colnames(Braydf_long)[1] <- "Var1" 
+test3_16S$clustering[test3_16S$clustering == 2]
+9/12 #Mix of lots of day 19 samples
 
+test3_16S$clustering[test3_16S$clustering == 3]
+6/11 #Rest is made up of day 28-42 samples
 
-#Remove self-comparisons
-Braydf_long = Braydf_long %>%
-    dplyr::filter(as.character(Var1) != as.character(Var2)) %>%
-    dplyr::mutate_if(is.factor,
-              as.character)
-Temporary_df = Braydf_long 
+#4 clusters
+test4_16S = pam(otutable_df_16S, k = 4)
+Plot4_16S = recordPlot(plot(silhouette(test4_16S)))
 
-#remove replicate information
-Temporary_df$Var1 = gsub("za","", Temporary_df$Var1)
-Temporary_df$Var1 = gsub("zb","", Temporary_df$Var1)
-Temporary_df$Var1 = gsub("zc","", Temporary_df$Var1)
-Temporary_df$Var1 = gsub("zd","", Temporary_df$Var1)
+test4_16S$clustering[test4_16S$clustering == 1]
+11/14 #Proportion that is from day 7 and 14
 
-#Determine source of sample
-Temporary_df$Substrate = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("p", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Pine"
-} else if (grepl("a", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Acryl"
-} else if (grepl("g", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Glass"
-} else if (grepl("t", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Tile"
-} else if (grepl("me", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Mesh"
-} else if (grepl("ws", Temporary_df$Var1[i]) == T){
-  Temporary_df$Substrate[i] = "Water"
-}
-  i=i+1
-}
+test4_16S$clustering[test4_16S$clustering == 2]
+14/35 #Proportion that is from day 7 and 14
 
-#Determine when sample was collected
-Temporary_df$Sample_time = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("0", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "0"
-} else if (grepl("1", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "7"
-} else if (grepl("2", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "14"
-} else if (grepl("3", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "19"
-} else if (grepl("4", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "28"
-} else if (grepl("5", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "42"
-} else if (grepl("6", Temporary_df$Var1[i]) == T){
-  Temporary_df$Sample_time[i] = "56"
-}
-  i=i+1
-}
+test4_16S$clustering[test4_16S$clustering == 3]
+9/63 #Proportion that is from day 7 and 14
 
-#Determine enclosure status of sample
-Temporary_df$Mesh_status = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("e", Temporary_df$Var1[i]) == T){
-  Temporary_df$Mesh_status[i] = "Non-enclosed"
-} else if (grepl("m", Temporary_df$Var1[i]) == T){
-  Temporary_df$Mesh_status[i] = "Enclosed"
-} else if (grepl("ws", Temporary_df$Var1[i]) == T){
-  Temporary_df$Mesh_status[i] = "Water"
-}
-  i=i+1
-}
+test4_16S$clustering[test4_16S$clustering == 4]
+6/11 #Proportion that is from day 7 and 14
 
-Temporary_df$StageofBiofilm = NA
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("1", Temporary_df$Var1[i]) == T){
-  Temporary_df$StageofBiofilm[i] = "Early"
-} else if (grepl("2", Temporary_df$Var1[i]) == T | grepl("3", Temporary_df$Var1[i]) == T | grepl("4", Temporary_df$Var1[i]) == T | grepl("5", Temporary_df$Var1[i]) == T | grepl("6", Temporary_df$Var1[i]) == T){
-  Temporary_df$StageofBiofilm[i] = "Late"
-} 
-  i=i+1
-}
+#5 clusters
+test5_16S = pam(otutable_df_16S, k = 5)
+Plot5_16S = recordPlot(plot(silhouette(test5_16S)))
 
-Temporary_df_18S_v0 = Temporary_df
-Temporary_df_18S = Temporary_df_18S_v0
-```
-```{r Combine prokaryotic and eukaryotic comparisons}
-Temporary_df_16S_v0$Sequencing = as.factor("Prokaryotes")
-Temporary_df_18S_v0$Sequencing = as.factor("Eukaryotes")
-
-Temporary_df = rbind(Temporary_df_16S_v0, Temporary_df_18S_v0)
-Temporary_df_v0 = Temporary_df
-
+#6 clusters
+test6_16S = pam(otutable_df_16S, k = 6)
+Plot6_16S = recordPlot(plot(silhouette(test6_16S)))
 
 ```
-```{r Subset to only those needed and plot}
-
-Temporary_df = subset(Temporary_df_v0, 
-                      !Var1 == "0ws" & 
-                        !Var1 == "1ws" & 
-                        !Var1 == "2ws" & 
-                        !Var1 == "3ws" & 
-                        !Var1 == "4ws" & 
-                        !Var1 == "5ws" & 
-                        !Var1 == "6ws" &
-                        !Var2 == "0wsza" &
-                        !Var2 == "0wszb" &
-                        !Var2 == "1wsza" &
-                        !Var2 == "1wszb" &
-                        !Var2 == "2wsza" &
-                        !Var2 == "2wszb" &
-                        !Var2 == "3wsza" &
-                        !Var2 == "3wszb" &
-                        !Var2 == "4wsza" &
-                        !Var2 == "4wszb" &
-                        !Var2 == "5wsza" &
-                        !Var2 == "5wszb" &
-                        !Var2 == "6wsza" &
-                        !Var2 == "6wszb" &
-                        !Substrate == "Mesh")
-#Subset to only compare intra time pointly
-Day_to_day_df = data.frame()
-y = 1
-for (i in 1:nrow(Temporary_df)) {
-if (grepl("1", Temporary_df$Var1[i]) == T && grepl("1", Temporary_df$Var2[i]) == T){
-  Day_to_day_df = rbind(Day_to_day_df, Temporary_df[i,])
-  y = y+1
-} else if (grepl("2", Temporary_df$Var1[i]) == T && grepl("2", Temporary_df$Var2[i]) == T){
-  Day_to_day_df = rbind(Day_to_day_df, Temporary_df[i,])
-  y = y+1
-} else if (grepl("3", Temporary_df$Var1[i]) == T && grepl("3", Temporary_df$Var2[i]) == T){
-  Day_to_day_df = rbind(Day_to_day_df, Temporary_df[i,])
-  y = y+1
-} else if (grepl("4", Temporary_df$Var1[i]) == T && grepl("4", Temporary_df$Var2[i]) == T){
-  Day_to_day_df = rbind(Day_to_day_df, Temporary_df[i,])
-  y = y+1
-} else if (grepl("5", Temporary_df$Var1[i]) == T && grepl("5", Temporary_df$Var2[i]) == T){
-  Day_to_day_df = rbind(Day_to_day_df, Temporary_df[i,])
-  y = y+1
-} else if (grepl("6", Temporary_df$Var1[i]) == T && grepl("6", Temporary_df$Var2[i]) == T){
-  Day_to_day_df = rbind(Day_to_day_df, Temporary_df[i,])
-  y = y+1
-}
-  i=i+1
-}
-
-D2D_clean_df = data.frame()
-for (i in 1:nrow(Day_to_day_df)) {
-if (grepl("me", Day_to_day_df$Var2[i]) == F){
-  D2D_clean_df = rbind(D2D_clean_df, Day_to_day_df[i,])
-  y = y+1
-}
-  i = i +1
-}
-
-
-#Make sure it worked
-D2D_clean_df
-nrow(D2D_clean_df)
-unique(D2D_clean_df$Substrate)
-
-#Reorder levels so that they make sense
-D2D_clean_df$Sample_time = factor(D2D_clean_df$Sample_time, 
-                                      levels = c(7,14,19,28,42,56))
-
-#Sumamrise for plotting
-Summary_D2D = summarySE(D2D_clean_df, measurevar = "Bray_dissimilarity", groupvars = c("Sample_time", "Sequencing", "StageofBiofilm"))
-
-#Convert and reorder for plotting
-Summary_D2D$Sample_time = as.factor(as.character(Summary_D2D$Sample_time))
-Summary_D2D$Sample_time = factor(Summary_D2D$Sample_time,
-                         levels=c("7",
-                                  "14",
-                                  "19",
-                                  "28",
-                                  "42",
-                                  "56"))
-
-#Design plot
-Figure1Cms = ggplot(Summary_D2D, aes(x = Sample_time, y = Bray_dissimilarity, colour = Sequencing, group = Sequencing))+
-  geom_line(lwd = 1)+
-      geom_errorbar(aes(ymin=(Bray_dissimilarity-sd), 
-                    ymax=(Bray_dissimilarity+sd),
-                    colour=Sequencing),
-                position=pd
-                )+
- # facet_grid(. ~ Mesh_status)+
-  scale_color_manual("Organism", values = Organism_list, labels = c("Prokaryotes", "Eukaryotes"))+
-  ylab("Bray-Curtis dissimilarity")+
-  xlab("Time (days)")+
-  theme_bw()+
-  My_Theme
-#Inspect
-Figure1Cms
-
-
-```
-```{r Calculate means}
-test_mean = D2D_clean_df %>% 
-  group_by(Sequencing, Sample_time) %>% 
-  summarise(mean_val = mean(Bray_dissimilarity ), sd = sd(Bray_dissimilarity ))
-print(test_mean)
-0.829-0.544 #Prokaryotes
-0.778 - 0.690 #Eukaryotes
-
-test_mean = D2D_clean_df %>% 
-  group_by(Sequencing, StageofBiofilm) %>% 
-  summarise(mean_val = mean(Bray_dissimilarity ), sd = sd(Bray_dissimilarity ))
-print(test_mean)
-test_mean$mean_val[1]-test_mean$mean_val[2]
-test_mean$sd[1]-test_mean$sd[2]
-test_mean$sd[1]/test_mean$mean_val[1]
-test_mean$sd[2]/test_mean$mean_val[2]
-(test_mean$sd[2]/test_mean$mean_val[2])/(test_mean$sd[1]/test_mean$mean_val[1])
-
-test_mean$mean_val[3]-test_mean$mean_val[4]
-test_mean$sd[3]-test_mean$sd[4]
-test_mean$sd[3]/test_mean$mean_val[3]
-test_mean$sd[4]/test_mean$mean_val[4]
-(test_mean$sd[4]/test_mean$mean_val[4])/(test_mean$sd[3]/test_mean$mean_val[3])
-```
-##Calculate statistics
-###Set up
-```{r}
-D2D_clean_df
-
-Day2Day_clean_df_16S = subset(D2D_clean_df, Sequencing == "16S")
-Day2Day_clean_df_18S = subset(D2D_clean_df, Sequencing == "18S")
-paste0(Day2Day_clean_df_16S$StageofBiofilm, Day2Day_clean_df_16S$Sample_time)
-paste0(Day2Day_clean_df_18S$StageofBiofilm, Day2Day_clean_df_18S$Sample_time)
-
-Summary_df = summarySE(D2D_clean_df, measurevar = "Bray_dissimilarity", groupvars = c("Sequencing", "Mesh_status", "Sample_time", "StageofBiofilm"))
-Summary_df$Sample_time = as.numeric(as.character(Summary_df$Sample_time))
-#Day2Day_clean_df$Sample_time = as.numeric(as.character(Day2Day_clean_df$Sample_time))
-
-Diss_16S_df = subset(Summary_df, Sequencing == "16S")
-Diss_18S_df = subset(Summary_df,  Sequencing == "18S")
-#Diss_16S_df = subset(D2D_clean_df, Sequencing == "16S")
-#Diss_18S_df = subset(D2D_clean_df,  Sequencing == "18S")
-
-Diss_18S_df$StageofBiofilm = as.factor(Diss_18S_df$StageofBiofilm)
-
-Diss_18S_df$StageofBiofilm[grep("7", Diss_18S_df$Sample_time)] = as.factor("Early")
-Diss_18S_df$StageofBiofilm[grep("14", Diss_18S_df$Sample_time)] = as.factor("Early")
-Diss_18S_df$StageofBiofilm[grep("19", Diss_18S_df$Sample_time)] = as.factor("Late")
-Diss_18S_df$StageofBiofilm[grep("28", Diss_18S_df$Sample_time)] = as.factor("Late")
-Diss_18S_df$StageofBiofilm[grep("42", Diss_18S_df$Sample_time)] = as.factor("Late")
-Diss_18S_df$StageofBiofilm[grep("56", Diss_18S_df$Sample_time)] = as.factor("Late")
-
-Enclosed_16S_df = subset(Summary_df, Mesh_status == "Enclosed" & Sequencing == "16S")
-Enclosed_18S_df = subset(Summary_df, Mesh_status == "Enclosed" & Sequencing == "18S")
-Exposed_16S_df = subset(Summary_df, Mesh_status == "Exposed" & Sequencing == "16S")
-Exposed_18S_df = subset(Summary_df, Mesh_status == "Exposed" & Sequencing == "18S")
-#Enclosed_16S_df = subset(D2D_clean_df, Mesh_status == "Enclosed" & Sequencing == "16S")
-#Enclosed_18S_df = subset(D2D_clean_df, Mesh_status == "Enclosed" & Sequencing == "18S")
-#Exposed_16S_df = subset(D2D_clean_df, Mesh_status == "Exposed" & Sequencing == "16S")
-#Exposed_18S_df = subset(D2D_clean_df, Mesh_status == "Exposed" & Sequencing == "18S")
-```
-###Kruskal-Wallis
+#Eukaryotic silhouette analysis
+No seeming cluster effect - assessing day 7 clusteirng from everything else based on other evidence
 ```{r}
 
-####Sample_time####
-kruskal.test(Bray_dissimilarity ~ Sample_time, data = Day2Day_clean_df_16S)
-#Chi = 748.63
-#p < 0.01
-test_mean = Day2Day_clean_df_16S %>% 
-  group_by(Sample_time) %>% 
-  summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[6]-test_mean$mean_val[5]
+#Restore a pristine copy from back up
+Phyloseq_Biofilm_18S = Phyloseq_Biofilm_18S_v0
 
-pairwise.wilcox.test(Day2Day_clean_df_16S$Bray_dissimilarity, Day2Day_clean_df_16S$Sample_time, p.adjust.method = "bonferroni")
+#Subset to only substrate associated biofilms
+Phyloseq_Biofilm_18S_noA = subset_samples(Phyloseq_Biofilm_18S, Project == "Marine_Biofilm" & Sample_type == "Biofilm" & !Substrate == "Water"& !Substrate == "Mesh")
 
+#Extract otu table
+otutable_df_18S = as.data.frame(as.matrix(otu_table(Phyloseq_Biofilm_18S_noA)))
+nrow(otutable_df_18S)
 
-kruskal.test(Bray_dissimilarity ~ Sample_time, data = Day2Day_clean_df_18S)
-#Chi = 144.24
-#p < 0.01
-test_mean = Day2Day_clean_df_18S %>% 
-  group_by(Sample_time) %>% 
-  summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[6]-test_mean$mean_val[5]
+#2 clusters
+test2_18S = pam(otutable_df_18S, k = 2)
+Plot2_18S = recordPlot(plot(silhouette(test2_18S)))
+#This shows minimal number of misclassified samples
 
-####Substrate####
-kruskal.test(Bray_dissimilarity ~ Substrate, data = Day2Day_clean_df_16S)
-#Chi = 52.902
-#p < 0.01
-test_mean = Day2Day_clean_df_16S %>% 
-  group_by(Substrate) %>% 
-  dplyr::summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[3]-((test_mean$mean_val[1] + test_mean$mean_val[2] + test_mean$mean_val[4])/3)
+#Save figure
+tiff("/YOUR/PATH/HERE/Figures_Tables/SupplementaryFigure1msD_EukaryoticSilhouette.tiff", height = 6.66, width = 8, units = "in", res = 300)
+Plot2_18S = recordPlot(plot(silhouette(test2_18S)))
+dev.off()
 
-kruskal.test(Bray_dissimilarity ~ Substrate, data = Day2Day_clean_df_18S)
-#Chi = 7.5024
-#p = 0.0575
+test2_18S$clustering[test2_18S$clustering == 1]
+38/110 #Proportion that is from day 7 and 14
+
+test2_18S$clustering[test2_18S$clustering == 2]
+3/20 #Proportion that is from day 7 and 14
+
+#3 clusters
+test3_18S = pam(otutable_df_18S, k = 3)
+Plot3_18S = recordPlot(plot(silhouette(test3_18S)))
+
+test3_18S$clustering[test3_18S$clustering == 1]
+7/7 #Pure day 7 samples
+
+test3_18S$clustering[test3_18S$clustering == 2]
+12/103 #Mix of lots of day 14-56 samples
+
+test3_18S$clustering[test3_18S$clustering == 3]
+0/20 #Rest is made up of day 28-42 samples
+
+#4 clusters
+test4_18S = pam(otutable_df_18S, k = 4)
+Plot4_18S = recordPlot(plot(silhouette(test4_18S)))
+
+test4_18S$clustering[test4_18S$clustering == 1]
+7/7 #Proportion that is from day 7
+
+test4_18S$clustering[test4_18S$clustering == 2]
+12/95 #Proportion that is from day 7
+
+test4_18S$clustering[test4_18S$clustering == 3]
+0/15 #Proportion that is from day 7 
+
+test4_18S$clustering[test4_18S$clustering == 4]
+0/13 #Proportion that is from day 7 and 14
+
+#5 clusters
+test5_18S = pam(otutable_df_18S, k = 5)
+Plot5_18S = recordPlot(plot(silhouette(test5_18S)))
+
+#6 clusters
+test6_18S = pam(otutable_df_18S, k = 6)
+Plot6_18S = recordPlot(plot(silhouette(test6_18S)))
 
 ```
 
-###Spearman
+#Make figure using ggarrange
+
 ```{r}
-
-####Whole####
-cor.test(Diss_16S_df$Bray_dissimilarity, Diss_16S_df$Sample_time,  method = "s")
-#rho = -0.7632938 
-#p = 0.003871
-
-cor.test(Diss_18S_df$Bray_dissimilarity, Diss_18S_df$Sample_time,  method = "s")
-#rho = -0.2968365 
-#p = 0.3488
-
-####Enclosed####
-cor.test(Enclosed_16S_df$Bray_dissimilarity, Enclosed_16S_df$Sample_time,  method = "s")
-#rho = -0.8285714 
-#p = 0.05833
-
-cor.test(Enclosed_18S_df$Bray_dissimilarity, Enclosed_18S_df$Sample_time,  method = "s")
-#rho = -0.4285714 
-#p = 0.4194
-
-####Exposed####
-cor.test(Exposed_16S_df$Bray_dissimilarity, Exposed_16S_df$Sample_time,  method = "s")
-#rho = -0.8285714
-#p = 0.05833
-
-cor.test(Exposed_18S_df$Bray_dissimilarity, Exposed_18S_df$Sample_time,  method = "s")
-#rho = 0.2571429
-#p = 0.6583
-
-```
-###Wilcox
-```{r}
-
-####StageofBiofilm####
-wilcox.test(Bray_dissimilarity ~ StageofBiofilm, data = Day2Day_clean_df_16S)
-#W = 1181924
-#p < 0.01
-test_mean = Day2Day_clean_df_16S %>% 
-  group_by(StageofBiofilm) %>% 
-  summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[2]-test_mean$mean_val[1]
-
-wilcox.test(Bray_dissimilarity ~ StageofBiofilm, data = Day2Day_clean_df_18S)
-#W = 1018970
-#p < 0.01
-test_mean = Day2Day_clean_df_18S %>% 
-  group_by(StageofBiofilm) %>% 
-  summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[2]-test_mean$mean_val[1]
-
-
-####Mesh_status####
-wilcox.test(Bray_dissimilarity ~ Mesh_status, data = Day2Day_clean_df_16S)
-#W = 746824
-#p < 0.01
-test_mean = Day2Day_clean_df_16S %>% 
-  group_by(Mesh_status) %>% 
-  dplyr::summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[2]-test_mean$mean_val[1]
-
-wilcox.test(Bray_dissimilarity ~ Mesh_status, data = Day2Day_clean_df_18S)
-#W = 990939
-#p < 0.01
-test_mean = Day2Day_clean_df_18S %>% 
-  group_by(Mesh_status) %>% 
-  dplyr::summarise(mean_val = mean(Bray_dissimilarity), sd = sd(Bray_dissimilarity))
-print(test_mean)
-test_mean$mean_val[2]-test_mean$mean_val[1]
-####Enclosed####
-wilcox.test(Bray_dissimilarity ~ StageofBiofilm, data = Enclosed_16S_df)
-#W = 7
-#p = 0.4
-
-wilcox.test(Bray_dissimilarity ~ StageofBiofilm, data = Enclosed_18S_df)
-#W = 7
-#p = 0.2667
-
-####Exposed####
-wilcox.test(Bray_dissimilarity ~ StageofBiofilm, data = Exposed_16S_df)
-#W = 8
-#p = 0.2
-
-wilcox.test(Bray_dissimilarity ~ StageofBiofilm, data = Exposed_18S_df)
-#W = 4
-#p = 1
-```
-
-
-
-###Pairwise wilcox
-```{r}
-pairwise.wilcox.test(Day2Day_clean_df$Bray_dissimilarity, Day2Day_clean_df$Sample_time, p.adjust.method = "bonferroni")
-
-pairwise.wilcox.test(Day2Day_clean_df_16S$Bray_dissimilarity, Day2Day_clean_df_16S$Sample_time, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Day2Day_clean_df_18S$Bray_dissimilarity, Day2Day_clean_df_18S$Sample_time, p.adjust.method = "bonferroni")
-
-pairwise.wilcox.test(Day2Day_clean_df_16S$Bray_dissimilarity, Day2Day_clean_df_16S$Substrate, p.adjust.method = "bonferroni")
-pairwise.wilcox.test(Day2Day_clean_df_18S$Bray_dissimilarity, Day2Day_clean_df_18S$Substrate, p.adjust.method = "bonferroni")
-#Pine is significantly higher for prokaryotes
-
-```
-
-
-#Figure 1 D
-##Set up and run ASV
-```{r}
-####Prokaryotes ####
-#Extract otu table and convert to presence absence scheme
-otutable_df = as.data.frame(as.matrix(otu_table(Phyloseq_Biofilm_16S_noA)))
-otutable_df[otutable_df>0]<-1
-
-#Make empty dataframes for each time point
-otutable_df_D7_enc = data.frame()
-otutable_df_D14_enc = data.frame()
-otutable_df_D19_enc = data.frame()
-otutable_df_D28_enc = data.frame()
-otutable_df_D42_enc = data.frame()
-otutable_df_D56_enc = data.frame()
-otutable_df_D7_expo = data.frame()
-otutable_df_D14_expo = data.frame()
-otutable_df_D19_expo = data.frame()
-otutable_df_D28_expo = data.frame()
-otutable_df_D42_expo = data.frame()
-otutable_df_D56_expo = data.frame()
-
-#Fill dataframes
-i = 1
-#Split original dataframe into separate dataframes based on sample days
-for (i in 1:nrow(otutable_df)) {
-if (grepl("1", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){ #Loop for 1 in sample name, and if true run associated code, it not true then move onto next else.
-  otutable_df_D7_enc = rbind(otutable_df_D7_enc, otutable_df[i,]) #Extract row and combine into day specific dataframe.
-  
-} else if (grepl("2", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D14_enc = rbind(otutable_df_D14_enc, otutable_df[i,])
-  
-} else if (grepl("3", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D19_enc = rbind(otutable_df_D19_enc, otutable_df[i,])
-  
-} else if (grepl("4", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D28_enc = rbind(otutable_df_D28_enc, otutable_df[i,])
-  
-} else if (grepl("5", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D42_enc = rbind(otutable_df_D42_enc, otutable_df[i,])
-  
-} else if (grepl("6", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D56_enc = rbind(otutable_df_D56_enc, otutable_df[i,])
-
-} else if (grepl("1", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D7_expo = rbind(otutable_df_D7_expo, otutable_df[i,])
-  
-} else if (grepl("2", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D14_expo = rbind(otutable_df_D14_expo, otutable_df[i,])
-  
-} else if (grepl("3", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D19_expo = rbind(otutable_df_D19_expo, otutable_df[i,])
-  
-} else if (grepl("4", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D28_expo = rbind(otutable_df_D28_expo, otutable_df[i,])
-  
-} else if (grepl("5", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D42_expo = rbind(otutable_df_D42_expo, otutable_df[i,])
-  
-} else if (grepl("6", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D56_expo = rbind(otutable_df_D56_expo, otutable_df[i,])
-  
-} 
-  i=i+1
-}
-
-#Check rownames to see if it worked properly
-rownames(otutable_df)
-rownames(otutable_df_D7_enc)
-rownames(otutable_df_D14_enc)
-rownames(otutable_df_D19_enc)
-rownames(otutable_df_D28_enc)
-rownames(otutable_df_D42_enc)
-rownames(otutable_df_D56_enc)
-rownames(otutable_df_D7_expo)
-rownames(otutable_df_D14_expo)
-rownames(otutable_df_D19_expo)
-rownames(otutable_df_D28_expo)
-rownames(otutable_df_D42_expo)
-rownames(otutable_df_D56_expo)
-
-
-
-#Specify order number with however many samples there are
-#Make lists
-mesh_list = c("enc", "expo")
-Time_list = c(7,
-             14,
-             19,
-             28,
-             42,
-             56)
-countordermax = list()
-general_count = 1
-
-#Count number of samples
-for (i in 1:6) {
-  for (y in 1:2){
-    Object = get(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y]))
-    
-    temp = nrow(Object)
-    countordermax[general_count] = temp
-    general_count = general_count + 1
-  }
- }
-
-countordermax
-
-general_count = 1
-  
-i=1
-y=1
-
-#Set up progress bar and run calculations
-pb = txtProgressBar(min = 0, max = length(countordermax), initial = 0, style = 3)
-TIME <- Sys.time()
-TIME
-for (i in 1:6) {
-  for (y in 1:2){
-    Object = get(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y]))
-    zeta_decline.mc_calc = Zeta.decline.mc(data.spec =  Object, order = 1:countordermax[[general_count]])
-    saveRDS(zeta_decline.mc_calc, paste0("otutable_df_16S_D", Time_list[i], "_", mesh_list[y]))
-
-    Object2 = zeta_decline.mc_calc
-      assign(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y], "_16S_out"), Object2)
-      
-      setTxtProgressBar(pb, general_count)
-      Sys.time() - TIME
-      general_count = general_count + 1 
-  }
-  
-}
-Sys.time() - TIME
-
-####Eukaryotes ####
-#Extract otu table and convert to presence absence scheme
-otutable_df = as.data.frame(as.matrix(otu_table(Phyloseq_Biofilm_18S_noA)))
-otutable_df[otutable_df>0]<-1
-
-#Make empty dataframes for each time point
-otutable_df_D7_enc = data.frame()
-otutable_df_D14_enc = data.frame()
-otutable_df_D19_enc = data.frame()
-otutable_df_D28_enc = data.frame()
-otutable_df_D42_enc = data.frame()
-otutable_df_D56_enc = data.frame()
-otutable_df_D7_expo = data.frame()
-otutable_df_D14_expo = data.frame()
-otutable_df_D19_expo = data.frame()
-otutable_df_D28_expo = data.frame()
-otutable_df_D42_expo = data.frame()
-otutable_df_D56_expo = data.frame()
-
-#Fill dataframes
-i = 1
-#Split original dataframe into separate dataframes based on sample days
-for (i in 1:nrow(otutable_df)) {
-if (grepl("1", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){ #Loop for 1 in sample name, and if true run associated code, it not true then move onto next else.
-  otutable_df_D7_enc = rbind(otutable_df_D7_enc, otutable_df[i,]) #Extract row and combine into day specific dataframe.
-  
-} else if (grepl("2", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D14_enc = rbind(otutable_df_D14_enc, otutable_df[i,])
-  
-} else if (grepl("3", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D19_enc = rbind(otutable_df_D19_enc, otutable_df[i,])
-  
-} else if (grepl("4", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D28_enc = rbind(otutable_df_D28_enc, otutable_df[i,])
-  
-} else if (grepl("5", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D42_enc = rbind(otutable_df_D42_enc, otutable_df[i,])
-  
-} else if (grepl("6", rownames(otutable_df)[i]) == T && grepl("m", rownames(otutable_df)[i]) == T){
-  otutable_df_D56_enc = rbind(otutable_df_D56_enc, otutable_df[i,])
-
-} else if (grepl("1", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D7_expo = rbind(otutable_df_D7_expo, otutable_df[i,])
-  
-} else if (grepl("2", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D14_expo = rbind(otutable_df_D14_expo, otutable_df[i,])
-  
-} else if (grepl("3", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D19_expo = rbind(otutable_df_D19_expo, otutable_df[i,])
-  
-} else if (grepl("4", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D28_expo = rbind(otutable_df_D28_expo, otutable_df[i,])
-  
-} else if (grepl("5", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D42_expo = rbind(otutable_df_D42_expo, otutable_df[i,])
-  
-} else if (grepl("6", rownames(otutable_df)[i]) == T && grepl("e", rownames(otutable_df)[i]) == T){
-  otutable_df_D56_expo = rbind(otutable_df_D56_expo, otutable_df[i,])
-  
-} 
-  i=i+1
-}
-
-#Check rownames to see if it worked properly
-#rownames(otutable_df)
-rownames(otutable_df_D7_enc)
-rownames(otutable_df_D14_enc)
-rownames(otutable_df_D19_enc)
-rownames(otutable_df_D28_enc)
-rownames(otutable_df_D42_enc)
-rownames(otutable_df_D56_enc)
-rownames(otutable_df_D7_expo)
-rownames(otutable_df_D14_expo)
-rownames(otutable_df_D19_expo)
-rownames(otutable_df_D28_expo)
-rownames(otutable_df_D42_expo)
-rownames(otutable_df_D56_expo)
-
-
-#Specify order number with however many samples there are
-mesh_list = c("enc", "expo")
-Time_list = c(7,
-             14,
-             19,
-             28,
-             42,
-             56)
-countordermax = list()
-general_count = 1
- 
-#Count number of samples
-for (i in 1:6) {
-  for (y in 1:2){
-    Object = get(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y]))
-    
-    temp = nrow(Object)
-    countordermax[general_count] = temp
-    general_count = general_count + 1
-  }
- }
-
-countordermax
-
-general_count = 1
-  
-i=1
-y=1
-
-#Set up progress bar and run calculations
-pb = txtProgressBar(min = 0, max = length(countordermax), initial = 0, style = 3)
-TIME <- Sys.time()
-TIME
-for (i in 1:6) {
-  for (y in 1:2){
-    Object = get(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y]))
-    zeta_decline.mc_calc = Zeta.decline.mc(data.spec =  Object, order = 1:countordermax[[general_count]])
-    saveRDS(zeta_decline.mc_calc, paste0("otutable_df_18S_D", Time_list[i], "_", mesh_list[y]))
-
-    Object2 = zeta_decline.mc_calc
-      assign(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y], "_18S_out"), Object2)
-      
-      setTxtProgressBar(pb, general_count)
-      Sys.time() - TIME
-      general_count = general_count + 1 
-  }
-  
-}
-Sys.time() - TIME
-```
-##Extract data
-```{r}
-#Make extraction lists
-Time_list = c(7,14,19,28,42,56)
-mesh_list = c("enc", "expo")
-Org_list = c("16S", "18S")
-
-#Carry out extraction
-Summary_Zeta = data.frame(matrix(ncol = 5, nrow = 0))
-x = c("Day", "Mesh_status", "Shared", "Unique", "Sequencing")
-colnames(Summary_Zeta) <- x
-#pb = txtProgressBar(min = 0, max = length(Time_list), initial = 0)
-i = 1
-for (i in 1:length(Time_list)) {
-  for (y in 1:length(mesh_list)) {
-    for (x in 1:length(Org_list)) {
-    
-    assign("temp", get(paste0("otutable_df_D", Time_list[i], "_", mesh_list[y], "_", Org_list[x], "_out")))
-    
-    temp_df = data.frame("Day" = Time_list[i], 
-                         "Mesh_status" = mesh_list[y],
-                         "Shared" = tail(temp$zeta.val, n = 1), 
-                         "Unique" = head(temp$zeta.val, n = 1), 
-                         "Sequencing" = Org_list[x])
-    
-    Summary_Zeta = rbind(Summary_Zeta, temp_df)
-
-#setTxtProgressBar(pb,i)
-    }
-  }
-}
-Summary_Zeta
-
-
-Summary_Zeta$Mesh_status = gsub("enc", "Exclusive", Summary_Zeta$Mesh_status)
-Summary_Zeta$Mesh_status = gsub("expo", "Native", Summary_Zeta$Mesh_status)
-
-Summary_Zeta
-```
-##Plot
-```{r}
-#Convert to factor and reorder for easier plotting, so plotting makes logical sense, and consistency
-Summary_Zeta$Day = as.factor(as.character(Summary_Zeta$Day))
-Summary_Zeta$Day = factor(Summary_Zeta$Day,
-                         levels=c("7",
-                                  "14",
-                                  "19",
-                                  "28",
-                                  "42",
-                                  "56"))
-Summary_Zeta$Sequencing = as.character(Summary_Zeta$Sequencing)
-Summary_Zeta$Sequencing = gsub("16S", "Prokaryotes", Summary_Zeta$Sequencing)
-Summary_Zeta$Sequencing = gsub("18S", "Eukaryotes", Summary_Zeta$Sequencing)
-Summary_Zeta$Sequencing = factor(Summary_Zeta$Sequencing,
-                         levels=c("Prokaryotes", 
-                                  "Eukaryotes"))
-
-#Make plot
-Figure1Dms = ggplot(data = Summary_Zeta, aes(x = Day, y = Shared, colour = Mesh_status, group = Mesh_status))+
-  geom_line(lwd = 1)+
-  scale_color_manual("Condition", values = Mesh_Palette)+
-  scale_y_log10()+
-  xlab("Time (days)")+
-  ylab("Number of shared ASVs")+
- # ggtitle("Shared ASVs across samples increases with time")+
-  facet_grid(. ~ Sequencing)+
-  theme_bw()+
-  My_Theme
-
-#Show plot
-Figure1Dms
-
-```
-
-##Calculate mean trends and statistical significance
-```{r Set up}
-
-#Subset to prokaryotes and eukaryotes specifically
-Summary_Zeta_Prok = subset(Summary_Zeta, Sequencing == "Prokaryotes")
-Summary_Zeta_Euk = subset(Summary_Zeta, Sequencing == "Eukaryotes")
-
-#Add early vs late as new column
-Summary_Zeta_Prok$StageofBiofilm = "tmp"
-Summary_Zeta_Prok$StageofBiofilm[grep("7", Summary_Zeta_Prok$Day)] = "Early"
-Summary_Zeta_Prok$StageofBiofilm[grep("14", Summary_Zeta_Prok$Day)] = "Early"
-Summary_Zeta_Prok$StageofBiofilm[grep("19", Summary_Zeta_Prok$Day)] = "Late"
-Summary_Zeta_Prok$StageofBiofilm[grep("28", Summary_Zeta_Prok$Day)] = "Late"
-Summary_Zeta_Prok$StageofBiofilm[grep("42", Summary_Zeta_Prok$Day)] = "Late"
-Summary_Zeta_Prok$StageofBiofilm[grep("56", Summary_Zeta_Prok$Day)] = "Late"
-Summary_Zeta_Euk$StageofBiofilm = "tmp"
-Summary_Zeta_Euk$StageofBiofilm[grep("7", Summary_Zeta_Euk$Day)] = "Early"
-Summary_Zeta_Euk$StageofBiofilm[grep("14", Summary_Zeta_Euk$Day)] = "Late"
-Summary_Zeta_Euk$StageofBiofilm[grep("19", Summary_Zeta_Euk$Day)] = "Late"
-Summary_Zeta_Euk$StageofBiofilm[grep("28", Summary_Zeta_Euk$Day)] = "Late"
-Summary_Zeta_Euk$StageofBiofilm[grep("42", Summary_Zeta_Euk$Day)] = "Late"
-Summary_Zeta_Euk$StageofBiofilm[grep("56", Summary_Zeta_Euk$Day)] = "Late"
-
-Summary_Zeta = rbind(Summary_Zeta_Prok, Summary_Zeta_Euk)
-```
-```{r Calculate means}
-test_mean = Summary_Zeta_Prok %>% 
-  group_by(Day) %>% 
-  summarise(mean_val = mean(Shared), sd = sd(Shared))
-print(test_mean)
-
-#Factor increase from 7 to 56
-test_mean$mean_val[6]/test_mean$mean_val[1]
-
-test_mean = Summary_Zeta_Euk %>% 
-  group_by(Day) %>% 
-  summarise(mean_val = mean(Shared), sd = sd(Shared))
-print(test_mean)
-
-#Factor increase from 7 to 56
-test_mean$mean_val[6]/test_mean$mean_val[1]
-```
-```{r Stats}
-kruskal.test(Summary_Zeta$Shared, Summary_Zeta$Day, p.adjust.method = "bonferroni")
-#Non-significant
-wilcox.test(Summary_Zeta$Shared ~ Summary_Zeta$StageofBiofilm, p.adjust.method = "bonferroni")
-#Significant
-
-kruskal.test(Summary_Zeta_Prok$Shared, Summary_Zeta_Prok$Day, p.adjust.method = "bonferroni")
-#Non-significant
-kruskal.test(Summary_Zeta_Euk$Shared, Summary_Zeta_Euk$Day, p.adjust.method = "bonferroni")
-#Non-significant
-
-wilcox.test(Summary_Zeta_Prok$Shared ~ Summary_Zeta_Prok$StageofBiofilm, p.adjust.method = "bonferroni")
-#Significant
-wilcox.test(Summary_Zeta_Euk$Shared ~ Summary_Zeta_Euk$StageofBiofilm, p.adjust.method = "bonferroni")
-#Non-significant
-
-pairwise.wilcox.test(Summary_Zeta_Prok$Shared, Summary_Zeta_Prok$Day, p.adjust.method = "bonferroni")
-#No significance
-pairwise.wilcox.test(Summary_Zeta_Euk$Shared, Summary_Zeta_Euk$Day, p.adjust.method = "bonferroni")
-#No significance
-
-cor.test(as.numeric(as.character(Summary_Zeta_Prok$Shared)), as.numeric(as.character(Summary_Zeta_Prok$Day)), method = "s")
-#Significant
-cor.test(as.numeric(as.character(Summary_Zeta_Euk$Shared)), as.numeric(as.character(Summary_Zeta_Euk$Day)), method = "s")
-#Non-significant
-```
-#Combine into one figure
-```{r}
-
-#Make
-Top = ggarrange(Observed_16S,
-                      Observed_18S,
-                #Pielou_16S,
-               # Pielou_18S,
-                      common.legend = T,
-                      legend = "right",
-                 #     nrow = 2,
-                ncol = 2,
-                      labels = c("AUTO"),
-                align = "hv")
-#Inspect
-Top
-
-Bottom = ggarrange(Figure1Cms,
-                   Figure1Dms,
-                   common.legend = F,
-                   nrow = 1,
-                   ncol = 2,
-                   labels = c("C", "D"))
-
-#Inspect
-Bottom
-
-
-Figure1ms = ggarrange(Top,
-                      Bottom,
-                      common.legend = F,
-                      ncol = 1,
-                      nrow = 2)
-
-#Inspect
-Figure1ms
-
-#Save plot
-pdf("~/Desktop/Biofilm_project/Analysis/Clean_ms_code/Figures_Table/Figure1ms_StageDevelopment.pdf", width = 16, height = 13.2)
-Figure1ms
+ggEcotone(Prok_groupings_heat)
+
+#Make figure
+SuppFigure3 = ggarrange(Plot_2_16S_eco, Plot_2_18S_eco,
+                        F, F,
+                        common.legend = F,
+          ncol = 2,
+          nrow = 2)
+#Check for error
+SuppFigure3
+
+#Save figure
+tiff("/YOUR/PATH/HERE/Figures_Tables/SupplementaryFigure3ms_EcotoneAndSilhouette.tiff", height = 12.2, width = 16, units = "in", res = 300)
+SuppFigure3
 dev.off()
 
 ```
-
-
-
-
-
-
 
