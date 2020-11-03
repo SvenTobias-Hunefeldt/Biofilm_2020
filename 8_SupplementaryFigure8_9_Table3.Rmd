@@ -1,5 +1,5 @@
 ---
-title: "Supplmentary Table - All families"
+title: "Supplementary Figures 8/9 and Table 3"
 author: "Sven Tobias-Hunefeldt"
 date: "30/03/2020"
 output: html_document
@@ -50,32 +50,32 @@ sigtab_2fold_FDR_Time <- subset(sigtab_2fold_EdgeR_Time, FDR < 0.1)
 
 keepTaxa_FDR_Time <- sigtab_2fold_EdgeR_Time$Genus #Extract the OTU table that was shown to be significant
 Twofold_FDR_Time <- subset_taxa(Phyloseq_Biofilm_16S_noA, Genus %in% keepTaxa_FDR_Time) #Subset the taxa by the OTUs that were shown to change significantly
-dat_2fold_FDR_Time <- tax_glom(Twofold_FDR_Time, taxrank = 'Phylum') %>%#Merge the species at the Phylum level
+dat_2fold_FDR_Time <- tax_glom(Twofold_FDR_Time, taxrank = 'Family') %>%#Merge the species at the Family level
   transform_sample_counts(function(x) {x/sum(x)} ) %>% #Extract abundance data from phyloseq object
   psmelt() #Melt it into a dataframe
 
-dat_2fold_FDR_Time <- dat_2fold_FDR_Time[order(dat_2fold_FDR_Time$Phylum),] #Order them at the Phylum level
+dat_2fold_FDR_Time <- dat_2fold_FDR_Time[order(dat_2fold_FDR_Time$Family),] #Order them at the Family level
 
-dat_2fold_FDR_Time$Phylum <- as.character(dat_2fold_FDR_Time$Phylum)
-  # group dataframe by Phylum, calculate relative abundance
+dat_2fold_FDR_Time$Family <- as.character(dat_2fold_FDR_Time$Family)
+  # group dataframe by Family, calculate relative abundance
 
 #Remove na values
 dat_2fold_FDR_Time$Abundance[grep(NaN, dat_2fold_FDR_Time$Abundance)] = 0
 
 #Summarise for table
-Summary_Time_Phylum_Prok <- summarySE(dat_2fold_FDR_Time, measurevar="Abundance", groupvars=c("Kingdom", "Phylum", "Mesh_status", "Sample_time", "StageofBiofilm", "Substrate"))
-Summary_Time_Phylum_Prok
+Summary_Time_Family_Prok <- summarySE(dat_2fold_FDR_Time, measurevar="Abundance", groupvars=c("Kingdom", "Family", "Mesh_status", "Sample_time", "StageofBiofilm", "Substrate"))
+Summary_Time_Family_Prok
 
 
 #Arrange and reduce file size for easier visualisation
-Summary_Time_Phylum_Prok<-dplyr::arrange(Summary_Time_Phylum_Prok, Phylum, Phylum, Abundance)
-Summary_Time_Phylum_Prok$Phylum <- factor(Summary_Time_Phylum_Prok$Phylum,
-                         levels=(unique(Summary_Time_Phylum_Prok$Phylum)))
+Summary_Time_Family_Prok<-dplyr::arrange(Summary_Time_Family_Prok, Family, Family, Abundance)
+Summary_Time_Family_Prok$Family <- factor(Summary_Time_Family_Prok$Family,
+                         levels=(unique(Summary_Time_Family_Prok$Family)))
 
-#write.csv(Summary_Time_Phylum, file = "~/Desktop/Biofilm_project/Analysis/Clean_Thesis_Code/Tables/Summary_Time_Phylum_16S.csv")
+#write.csv(Summary_Time_Family, file = "/YOUR/PATH/HERE/Summary_Time_Family_16S.csv")
 
 #Check for weird names and make Rare taxa name better.
-levels(Summary_Time_Phylum_Prok$Phylum)
+levels(Summary_Time_Family_Prok$Family)
 ```
 ```{r Eukaryotes}
 
@@ -101,49 +101,49 @@ sigtab_2fold_FDR_Time <- subset(sigtab_2fold_EdgeR_Time, FDR < 0.1)
 
 keepTaxa_FDR_Time <- sigtab_2fold_EdgeR_Time$Genus #Extract the OTU table that was shown to be significant
 Twofold_FDR_Time <- subset_taxa(Phyloseq_Biofilm_18S_noA, Genus %in% keepTaxa_FDR_Time) #Subset the taxa by the OTUs that were shown to change significantly
-dat_2fold_FDR_Time <- tax_glom(Twofold_FDR_Time, taxrank = 'Phylum') %>%#Merge the species at the Phylum level
+dat_2fold_FDR_Time <- tax_glom(Twofold_FDR_Time, taxrank = 'Family') %>%#Merge the species at the Family level
   transform_sample_counts(function(x) {x/sum(x)} ) %>% #Extract abundance data from phyloseq object
   psmelt() #Melt it into a dataframe
 
-dat_2fold_FDR_Time <- dat_2fold_FDR_Time[order(dat_2fold_FDR_Time$Phylum),] #Order them at the Phylum level
+dat_2fold_FDR_Time <- dat_2fold_FDR_Time[order(dat_2fold_FDR_Time$Family),] #Order them at the Family level
 
-dat_2fold_FDR_Time$Phylum <- as.character(dat_2fold_FDR_Time$Phylum)
-  # group dataframe by Phylum, calculate relative abundance
+dat_2fold_FDR_Time$Family <- as.character(dat_2fold_FDR_Time$Family)
+  # group dataframe by Family, calculate relative abundance
 
 #Remove na values
 dat_2fold_FDR_Time$Abundance[grep(NaN, dat_2fold_FDR_Time$Abundance)] = 0
 
 #Summarise for table
-Summary_Time_Phylum_Euk <- summarySE(dat_2fold_FDR_Time, measurevar="Abundance", groupvars=c("Kingdom", "Phylum", "Mesh_status", "Sample_time", "StageofBiofilm", "Substrate"))
-Summary_Time_Phylum_Euk
+Summary_Time_Family_Euk <- summarySE(dat_2fold_FDR_Time, measurevar="Abundance", groupvars=c("Kingdom", "Family", "Mesh_status", "Sample_time", "StageofBiofilm", "Substrate"))
+Summary_Time_Family_Euk
 
 #Reorder and arrange for easier viewing
-Summary_Time_Phylum_Euk<-dplyr::arrange(Summary_Time_Phylum_Euk, Phylum, Phylum, Abundance)
-Summary_Time_Phylum_Euk$Phylum <- factor(Summary_Time_Phylum_Euk$Phylum,
-                         levels=(unique(Summary_Time_Phylum_Euk$Phylum)))
-#write.csv(Summary_Time_Phylum_Euk, file = "~/Desktop/Biofilm_project/Analysis/Clean_Thesis_Code/Tables/Summary_Time_Phylum_18S.csv")
+Summary_Time_Family_Euk<-dplyr::arrange(Summary_Time_Family_Euk, Family, Family, Abundance)
+Summary_Time_Family_Euk$Family <- factor(Summary_Time_Family_Euk$Family,
+                         levels=(unique(Summary_Time_Family_Euk$Family)))
+#write.csv(Summary_Time_Family_Euk, file = "/YOUR/PATH/HERE/Summary_Time_Family_18S.csv")
 
 #Check for weird names and make Rare taxa name better.
-levels(Summary_Time_Phylum_Euk$Phylum)
-levels(Summary_Time_Phylum_Euk$Phylum)
+levels(Summary_Time_Family_Euk$Family)
+levels(Summary_Time_Family_Euk$Family)
 ```
 ```{r Combine into one csv file}
 #Ensure that dimensions match
-dim(Summary_Time_Phylum_Prok)
-dim(Summary_Time_Phylum_Euk)
+dim(Summary_Time_Family_Prok)
+dim(Summary_Time_Family_Euk)
 #Combine rows
-Summary_Time_Phylum_all = rbind(Summary_Time_Phylum_Prok, Summary_Time_Phylum_Euk)
+Summary_Time_Family_all = rbind(Summary_Time_Family_Prok, Summary_Time_Family_Euk)
 
 #Rename substrates
-Summary_Time_Phylum_all$Substrate = gsub("Acryl", "Plastic", Summary_Time_Phylum_all$Substrate)
-Summary_Time_Phylum_all$Substrate = gsub("Pine", "Wood", Summary_Time_Phylum_all$Substrate)
+Summary_Time_Family_all$Substrate = gsub("Acryl", "Plastic", Summary_Time_Family_all$Substrate)
+Summary_Time_Family_all$Substrate = gsub("Pine", "Wood", Summary_Time_Family_all$Substrate)
 
 #Rename enclosure conditions
-Summary_Time_Phylum_all$Mesh_status = gsub("Exposed", "Native", Summary_Time_Phylum_all$Mesh_status)
-Summary_Time_Phylum_all$Mesh_status = gsub("Enclosed", "Exclusive", Summary_Time_Phylum_all$Mesh_status)
+Summary_Time_Family_all$Mesh_status = gsub("Exposed", "Native", Summary_Time_Family_all$Mesh_status)
+Summary_Time_Family_all$Mesh_status = gsub("Enclosed", "Exclusive", Summary_Time_Family_all$Mesh_status)
 
 #Extract table
-write.csv(Summary_Time_Phylum_all, file = "~/Desktop/Biofilm_project/Analysis/Clean_ms_Code/Figures_Table/SupplementaryTable1_AgeCorrelatePhyla.csv")
+write.csv(Summary_Time_Family_all, file = "/YOUR/PATH/HERE/Figures_Table/SupplementaryTable1_AgeCorrelateFamily.csv")
 
 
 ```
