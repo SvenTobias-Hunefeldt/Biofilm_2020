@@ -1,5 +1,5 @@
 ---
-title: "Figure 3 - NMDS plot"
+title: "Figure 2 - NMDS plot"
 author: "Sven Tobias-Hunefeldt"
 date: "06/04/2020"
 output: html_document
